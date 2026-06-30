@@ -119,7 +119,7 @@ final class CrawlerProcess {
                   let e = obj["error"] as? String, let ft = FileType(rawValue: t) else { return nil }
             return .assetFailed(ft, u, e)
         case "done":
-            return .done((obj["downloaded"] as? Int ?? 0, obj["failed"] as? Int ?? 0))
+            return .done(CrawlSummary(downloaded: obj["downloaded"] as? Int ?? 0, failed: obj["failed"] as? Int ?? 0))
         case "error":
             return .error(obj["message"] as? String ?? "unknown")
         default:

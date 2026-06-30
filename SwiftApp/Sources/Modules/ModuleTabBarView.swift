@@ -22,7 +22,7 @@ struct ModuleTabBarView: View {
         }
         .padding(.horizontal, 24)
         .frame(height: 48)
-        .background(.backgroundCard)
+        .background(Color.backgroundCard)
         .overlay(alignment: .bottom) {
             Rectangle().fill(Color.borderSubtle).frame(height: 1)
         }

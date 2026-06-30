@@ -6,6 +6,11 @@ struct CrawlConfig: Codable {
     let savePath: URL
 }
 
+struct CrawlSummary {
+    let downloaded: Int
+    let failed: Int
+}
+
 enum CrawlerEvent {
     case ready
     case phase(String)
@@ -13,6 +18,6 @@ enum CrawlerEvent {
     case assetQueued(FileType, String)
     case assetDownloaded(FileType, URL, Int)
     case assetFailed(FileType, String, String)
-    case done(summary: (downloaded: Int, failed: Int))
+    case done(CrawlSummary)
     case error(String)
 }

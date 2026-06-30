@@ -29,7 +29,9 @@ jobs:
         run: |
           python3 -m venv .venv
           source .venv/bin/activate
-          pip install --quiet -e ".[test]" 2>/dev/null || pip install --quiet pytest httpx selectolax tldextract -e .
+          pip install --quiet --upgrade pip
+          pip install --quiet pytest httpx selectolax tldextract
+          pip install --quiet -e .
           pytest tests/ -v
 
       - name: Build Swift app (release, arm64 only)

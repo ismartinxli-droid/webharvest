@@ -15,7 +15,7 @@ struct TitleBarView: View {
         }
         .padding(.horizontal, 20)
         .frame(height: 52)
-        .background(.backgroundCard)
+        .background(Color.backgroundCard)
         .overlay(alignment: .bottom) {
             Rectangle().fill(Color.borderSubtle).frame(height: 1)
         }

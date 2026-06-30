@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Observation
 
@@ -22,7 +23,8 @@ final class AppState {
 
     init() {
         crawler.onEvent = { [weak self] event in
-            Task { @MainActor in self?.handle(event: event) }
+            guard let self else { return }
+            Task { @MainActor in self.handle(event: event) }
         }
     }
 
@@ -117,7 +119,7 @@ enum Progress: Equatable {
 
 enum LogEntry: Identifiable {
     case info(String), ok(String), err(String)
-    var id = UUID()
+    let id = UUID()
     var icon: String { switch self { case .info: return "○"; case .ok: return "✓"; case .err: return "✕" } }
     var text: String {
         switch self { case .info(let s), .ok(let s), .err(let s): return s }
