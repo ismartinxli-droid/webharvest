@@ -14,8 +14,12 @@ final class CrawlerProcess {
 
     /// Write diagnostics to ~/Desktop/WebHarvest.log for troubleshooting
     private static let diagURL = URL(fileURLWithPath: "~/Desktop/WebHarvest.log").standardizedFileURL
+    private static let diagEnabled: Bool = {
+        ProcessInfo.processInfo.environment["WEBHARVEST_DIAG"] == "1"
+    }()
 
     private static func diag(_ msg: String) {
+        guard diagEnabled else { return }
         let line = "[\(Date().ISO8601Format())] \(msg)\n"
         guard let data = line.data(using: .utf8) else { return }
         if FileManager.default.fileExists(atPath: diagURL.path) {
