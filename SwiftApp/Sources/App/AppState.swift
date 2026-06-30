@@ -119,7 +119,7 @@ enum Progress: Equatable {
 
 enum LogEntry: Identifiable {
     case info(String), ok(String), err(String)
-    let id = UUID()
+    var id: String { UUID().uuidString }
     var icon: String { switch self { case .info: return "○"; case .ok: return "✓"; case .err: return "✕" } }
     var text: String {
         switch self { case .info(let s), .ok(let s), .err(let s): return s }
