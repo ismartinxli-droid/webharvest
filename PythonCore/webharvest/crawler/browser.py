@@ -51,8 +51,8 @@ async def extract_asset_urls(target_url: str) -> tuple[set[str], dict[str, str]]
         page.on("requestfailed", lambda req: urls.add(req.url)
                  if req.resource_type in ("image", "media", "font") else None)
 
-        await page.goto(target_url, wait_until="networkidle", timeout=30000)
-        await page.wait_for_timeout(3000)
+        await page.goto(target_url, wait_until="domcontentloaded", timeout=60000)
+        await page.wait_for_timeout(5000)  # let lazy-loaders fire (5s for SPAs)
 
         # Extract all img/src attributes from DOM
         dom_urls = await page.evaluate("""() => {
