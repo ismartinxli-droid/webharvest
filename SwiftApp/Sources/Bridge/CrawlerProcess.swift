@@ -191,14 +191,21 @@ final class CrawlerProcess {
         handle.readabilityHandler = { [weak self] fh in
             let chunk = fh.availableData
             if chunk.isEmpty { return }
+            Self.diag("stdout raw: \(chunk.count) bytes")
             buffer.append(chunk)
             while let nl = buffer.firstIndex(of: 0x0A) {
                 let line = buffer.prefix(upTo: nl)
                 buffer = buffer.suffix(from: buffer.index(after: nl))
-                if let event = Self.decode(Data(line)) {
+                let lineData = Data(line)
+                if let text = String(data: lineData, encoding: .utf8) {
+                    Self.diag("stdout line: \(text.prefix(200))")
+                }
+                if let event = Self.decode(lineData) {
+                    Self.diag("parsed event: \(event)")
                     self?.onEvent?(event)
-                } else if let text = String(data: Data(line), encoding: .utf8) {
+                } else if let text = String(data: lineData, encoding: .utf8) {
                     self?.log.info("unparsed stdout: \(text)")
+                    Self.diag("unparsed: \(text.prefix(200))")
                 }
             }
         }
