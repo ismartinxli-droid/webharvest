@@ -63,20 +63,27 @@ jobs:
 
       - name: Embed Python runtime (python-build-standalone)
         run: |
+          set -e
           PBS_VERSION="20231002"
           PBS_TAG="cpython-3.11.6+${PBS_VERSION}-aarch64-apple-darwin-install_only"
           PBS_URL="https://github.com/astral-sh/python-build-standalone/releases/download/${PBS_VERSION}/${PBS_TAG}.tar.gz"
-          
+
           mkdir -p /tmp/pbs
-          curl -L --silent --show-error --fail -o /tmp/pbs/python.tar.gz "$PBS_URL"
-          tar -xzf /tmp/pbs/python.tar.gz -C /tmp/pbs --strip-components=1
-          
+          echo "Downloading PBS from $PBS_URL"
+          curl -L --show-error --fail -o /tmp/pbs/python.tar.gz "$PBS_URL"
+          ls -la /tmp/pbs/python.tar.gz
+
+          echo "Extracting..."
+          tar -xzf /tmp/pbs/python.tar.gz -C /tmp/pbs
+          ls /tmp/pbs/
+          ls /tmp/pbs/python/bin/ | head
+
           mkdir -p dist/WebHarvest.app/Contents/Resources/python
           cp -R /tmp/pbs/python/bin dist/WebHarvest.app/Contents/Resources/python/
           cp -R /tmp/pbs/python/lib dist/WebHarvest.app/Contents/Resources/python/
-          
-          # install our deps + webharvest into embedded runtime
+
           PY="dist/WebHarvest.app/Contents/Resources/python/bin/python3"
+          "$PY" --version
           "$PY" -m ensurepip --upgrade
           "$PY" -m pip install --quiet --target dist/WebHarvest.app/Contents/Resources/python/site-packages \
               httpx selectolax tldextract
