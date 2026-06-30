@@ -37,11 +37,21 @@ async def extract_asset_urls(target_url: str) -> tuple[set[str], dict[str, str],
         )
         page = await context.new_page()
 
-        # Strip webdriver property to avoid WAF detection
+        # Strip webdriver property and spoof browser signals to avoid WAF detection.
+        # EdgeOne (Tencent Cloud) checks navigator.webdriver, plugins, languages,
+        # hardwareConcurrency, deviceMemory, and permissions.query.
         await page.add_init_script("""
             Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
             Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
             Object.defineProperty(navigator, 'languages', { get: () => ['zh-CN', 'zh', 'en'] });
+            Object.defineProperty(navigator, 'hardwareConcurrency', { get: () => 8 });
+            Object.defineProperty(navigator, 'deviceMemory', { get: () => 8 });
+            const _origQuery = window.navigator.permissions.query;
+            window.navigator.permissions.query = (params) => (
+                params.name === 'notifications'
+                    ? Promise.resolve({ state: Notification.permission })
+                    : _origQuery(params)
+            );
         """)
 
         # Capture image/media/font responses AND save their bodies.
@@ -74,6 +84,20 @@ async def extract_asset_urls(target_url: str) -> tuple[set[str], dict[str, str],
         await page.goto(target_url, wait_until="domcontentloaded", timeout=60000)
         await page.wait_for_timeout(3000)  # let initial JS render
 
+        # If the page was blocked by WAF (EdgeOne/CloudFlare), first warm up
+        # by visiting the homepage to establish a legitimate browser session,
+        # then retry the target page. This is critical for /esg and other
+        # sub-paths on nio.cn which have stricter WAF rules than the homepage.
+        body_snippet = await page.evaluate("() => document.body.innerText.substring(0, 200)")
+        if "EdgeOne" in body_snippet or "安全策略拦截" in body_snippet:
+            from urllib.parse import urlparse as _up
+            home_url = f"{_up(target_url).scheme}://{_up(target_url).netloc}/"
+            if home_url != target_url.rstrip("/") + "/":
+                await page.goto(home_url, wait_until="domcontentloaded", timeout=30000)
+                await page.wait_for_timeout(2000)
+                await page.goto(target_url, wait_until="domcontentloaded", timeout=60000)
+                await page.wait_for_timeout(3000)
+
         # Scroll to trigger lazy-loaded images (many SPAs load images on scroll).
         # lixiang.com and similar sites only render product images when scrolled into view.
         page_height = await page.evaluate("() => document.body.scrollHeight")
@@ -90,6 +114,29 @@ async def extract_asset_urls(target_url: str) -> tuple[set[str], dict[str, str],
         font_bodies = await _extract_fonts_from_stylesheets(page)
         for url, body in font_bodies.items():
             saved_bodies[url] = body
+
+        # Download linked PDFs via page context (CDN-hosted PDFs are blocked by WAF
+        # when fetched via httpx, but work fine with fetch() inside the browser session).
+        pdf_urls = await page.evaluate("""() => {
+            const urls = [];
+            const seen = new Set();
+            document.querySelectorAll('a[href]').forEach(a => {
+                const href = a.href || a.getAttribute('href') || '';
+                if (!href || href.startsWith('javascript:') || href.startsWith('data:')) return;
+                const lower = href.toLowerCase();
+                if (lower.endsWith('.pdf') || lower.includes('.pdf?')) {
+                    try {
+                        const abs = new URL(href, location.href).href.split('#')[0];
+                        if (!seen.has(abs)) { seen.add(abs); urls.push(abs); }
+                    } catch(e) {}
+                }
+            });
+            return urls;
+        }""")
+        if pdf_urls:
+            pdf_bodies = await _download_assets_via_fetch(page, pdf_urls)
+            for url, body in pdf_bodies.items():
+                saved_bodies[url] = body
 
         # Extract all img/src attributes from DOM, PLUS computed background images.
         # Many modern sites (e.g. lixiang.com) render car/product photos as CSS
@@ -160,6 +207,13 @@ async def extract_asset_urls(target_url: str) -> tuple[set[str], dict[str, str],
                 }
             });
 
+            // --- <a href> links to downloadable files (PDFs, images, videos)
+            //     Many sites host these on CDN domains, not caught by image response hooks.
+            document.querySelectorAll('a[href]').forEach(el => {
+                const h = el.href;
+                if (h && IMG_EXTS.test(h)) s.add(h);
+            });
+
             return Array.from(s);
         }""")
 
@@ -185,6 +239,49 @@ async def extract_asset_urls(target_url: str) -> tuple[set[str], dict[str, str],
         await browser.close()
 
     return urls, cookies, saved_bodies
+
+
+async def _download_assets_via_fetch(page, urls: list[str]) -> dict[str, bytes]:
+    """Download arbitrary assets via fetch() in the page context.
+    Used for CDN-hosted PDFs and other files that WAF blocks for httpx
+    but allows inside the browser session."""
+    result: dict[str, bytes] = {}
+    if not urls:
+        return result
+
+    try:
+        raw = await page.evaluate("""(urls) => {
+            async function dl(urls) {
+                const results = {};
+                for (const url of urls) {
+                    try {
+                        const resp = await fetch(url, {credentials: "include"});
+                        if (!resp.ok) continue;
+                        const blob = await resp.blob();
+                        const reader = new FileReader();
+                        const base64 = await new Promise((resolve) => {
+                            reader.onload = () => resolve(reader.result);
+                            reader.readAsDataURL(blob);
+                        });
+                        results[url] = base64;
+                    } catch(e) {}
+                }
+                return JSON.stringify(results);
+            }
+            return dl(urls);
+        }""", urls)
+
+        import json, base64
+        raw_results = json.loads(raw)
+        for url, data_url in raw_results.items():
+            if isinstance(data_url, str) and "," in data_url:
+                raw_bytes = base64.b64decode(data_url.split(",", 1)[1])
+                if raw_bytes and len(raw_bytes) > 100:
+                    result[url] = raw_bytes
+    except Exception:
+        pass
+
+    return result
 
 
 async def _extract_fonts_from_stylesheets(page) -> dict[str, bytes]:
@@ -314,6 +411,8 @@ async def download_assets_via_playwright(
             Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
             Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
             Object.defineProperty(navigator, 'languages', { get: () => ['zh-CN', 'zh', 'en'] });
+            Object.defineProperty(navigator, 'hardwareConcurrency', { get: () => 8 });
+            Object.defineProperty(navigator, 'deviceMemory', { get: () => 8 });
         """)
 
         dest = Path(dest_dir)

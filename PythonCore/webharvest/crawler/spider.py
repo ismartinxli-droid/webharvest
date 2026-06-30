@@ -153,7 +153,12 @@ async def run(url: str, types: set[str], save_path: str, max_depth: int = 3) -> 
             except Exception:
                 return
 
-            html = HTMLParser(resp.text)
+            # Detect WAF block pages (EdgeOne / CloudFlare) and skip quickly
+            page_text = resp.text
+            if len(page_text) < 500 or "EdgeOne" in page_text or "安全策略拦截" in page_text or "cf-browser-verification" in page_text:
+                return
+
+            html = HTMLParser(page_text)
 
             # Extract ALL URLs from the page for asset checking
             all_urls: set[str] = set()
@@ -263,12 +268,17 @@ async def run(url: str, types: set[str], save_path: str, max_depth: int = 3) -> 
                         except Exception:
                             pass
 
-            # Filter URLs: only same-host
-            same_host_urls = {u for u in all_urls if _same_host(u, base_host)}
-
-            # Try downloading all discovered asset URLs
-            for asset_url in same_host_urls:
-                await try_download(asset_url)
+            # Download asset URLs discovered on this page.
+            # Asset URLs (with known file extensions) are downloaded regardless of host —
+            # many sites host PDFs/images on CDN domains (e.g. cdn-public.nio.com).
+            # Only page-discovered links need same-host filtering.
+            _ASSET_EXT_RE = re.compile(
+                r"\.(jpg|jpeg|png|gif|webp|bmp|svg|mp4|mov|webm|pdf|ico|avif|tiff|heic|ttf|otf|woff|woff2)(\?.*)?$",
+                re.IGNORECASE,
+            )
+            for asset_url in all_urls:
+                if _ASSET_EXT_RE.search(asset_url):
+                    await try_download(asset_url)
 
             # Discover new page links (sub-pages) — only if not at max depth
             if depth < max_depth:
@@ -295,7 +305,7 @@ async def run(url: str, types: set[str], save_path: str, max_depth: int = 3) -> 
                 seen_assets.add(asset_url)
                 # Determine content-type and type from response headers
                 # We don't have headers, so use URL extension as fallback
-                from ..config import FOLDER_BY_TYPE, IMAGE_EXTS, VIDEO_EXTS, FONT_EXTS
+                from ..config import FOLDER_BY_TYPE, IMAGE_EXTS, VIDEO_EXTS, FONT_EXTS, PDF_EXTS
                 url_lower = asset_url.lower()
                 ftype = None
                 for ext in IMAGE_EXTS:
@@ -311,6 +321,11 @@ async def run(url: str, types: set[str], save_path: str, max_depth: int = 3) -> 
                     for ext in FONT_EXTS:
                         if f".{ext}" in url_lower or f".{ext}?" in url_lower:
                             ftype = "font"
+                            break
+                if ftype is None:
+                    for ext in PDF_EXTS:
+                        if f".{ext}" in url_lower or f".{ext}?" in url_lower:
+                            ftype = "pdf"
                             break
                 if ftype is None or ftype not in types:
                     continue
