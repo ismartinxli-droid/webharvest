@@ -1,0 +1,398 @@
+{
+  "$schema": "https://ardot.example/schemas/design-tokens/v1.json",
+  "design_system": {
+    "name": "WebHarvest Design System",
+    "version": "0.1.0",
+    "base_unit": 4
+  },
+  "color": {
+    "background": {
+      "page": "#F9F9FB",
+      "card": "#FFFFFF",
+      "input": "#F9FAFE",
+      "tab_active_fill": "#F2F2FE",
+      "disabled_fill": "#F4F5F8"
+    },
+    "text": {
+      "primary": "#1A1A2E",
+      "secondary": "#6B6B8A",
+      "tertiary": "#9498AB",
+      "disabled": "#B0B4C0",
+      "inverse": "#FFFFFF",
+      "active_accent": "#5046E5"
+    },
+    "border": {
+      "subtle": "#E7E7EA",
+      "default": "#D8DCE8",
+      "strong": "#B0B4C0",
+      "active_accent": "#5046E5",
+      "active_accent_25": "rgba(80, 70, 229, 0.25)"
+    },
+    "accent": {
+      "brand": "#5046E5",
+      "brand_hover": "#4038C7",
+      "success": "#10B981",
+      "warning": "#F59E0B",
+      "danger": "#FF6B9D"
+    }
+  },
+  "radius": {
+    "card": 16,
+    "input": 10,
+    "button": 10,
+    "tab": 8,
+    "tab_pill": 100,
+    "checkbox": 5,
+    "caret": 1
+  },
+  "shadow": {
+    "card": {
+      "type": "DROP_SHADOW",
+      "offset": { "x": 0, "y": 4 },
+      "radius": 16,
+      "spread": -2,
+      "color": "rgba(15, 20, 25, 0.06)"
+    },
+    "card_inner": {
+      "type": "DROP_SHADOW",
+      "offset": { "x": 0, "y": 1 },
+      "radius": 2,
+      "spread": 0,
+      "color": "rgba(15, 20, 25, 0.04)"
+    },
+    "button_primary": {
+      "type": "DROP_SHADOW",
+      "offset": { "x": 0, "y": 4 },
+      "radius": 12,
+      "spread": -2,
+      "color": "rgba(80, 70, 229, 0.25)"
+    }
+  },
+  "spacing": {
+    "page_padding_x": 48,
+    "page_padding_y": 20,
+    "card_padding_x": 32,
+    "card_padding_y": 28,
+    "card_gap": 20,
+    "field_gap": 8,
+    "chip_gap": 10,
+    "action_gap": 12,
+    "tab_gap": 4,
+    "tab_bar_padding_x": 24
+  },
+  "size": {
+    "window_width": 960,
+    "window_height": 680,
+    "title_bar_height": 52,
+    "tab_bar_height": 48,
+    "input_height": 48,
+    "button_height": 44,
+    "chip_height": 40,
+    "tab_height": 36,
+    "logo_size": 36,
+    "traffic_light": 12,
+    "checkbox": 18
+  },
+  "typography": {
+    "family": {
+      "primary": "Inter",
+      "fallback": "system-ui, sans-serif",
+      "cjk": "PingFang SC, Noto Sans SC, sans-serif"
+    },
+    "weight": {
+      "regular": "400",
+      "medium": "500",
+      "semibold": "600",
+      "bold": "700"
+    },
+    "scale": {
+      "hero_title": { "size": 32, "weight": "700", "lineHeight": 1.25, "letterSpacing": "-0.018em" },
+      "brand": { "size": 20, "weight": "700" },
+      "section_title": { "size": 18, "weight": "600" },
+      "field_label": { "size": 13, "weight": "600" },
+      "input_text": { "size": 15, "weight": "400" },
+      "body": { "size": 14, "weight": "400" },
+      "caption": { "size": 12, "weight": "400" },
+      "small": { "size": 11, "weight": "500" },
+      "button": { "size": 14, "weight": "600" },
+      "button_small": { "size": 13, "weight": "600" },
+      "badge": { "size": 10, "weight": "500" },
+      "app_title": { "size": 13, "weight": "600" }
+    }
+  },
+  "components": {
+    "app_window": {
+      "node_id": "2:1",
+      "name": "App Window",
+      "type": "frame",
+      "layout": "vertical",
+      "width": 960,
+      "height": 680,
+      "fills": "#F9F9FB",
+      "items": [
+        "2:2",
+        "2:77",
+        "2:9"
+      ]
+    },
+    "title_bar": {
+      "node_id": "2:2",
+      "name": "Title Bar",
+      "type": "frame",
+      "layout": "horizontal",
+      "width": "fill_container",
+      "height": 52,
+      "fills": "#FFFFFF",
+      "border_bottom": "1px #E7E7EA",
+      "items": ["2:3", "2:7", "2:8"],
+      "padding": { "left": 20, "right": 20 }
+    },
+    "traffic_lights": {
+      "node_id": "2:3",
+      "name": "Traffic Lights",
+      "type": "frame",
+      "layout": "horizontal",
+      "items": [
+        { "id": "2:4", "color": "#FF5F67", "shape": "ellipse", "size": 12 },
+        { "id": "2:5", "color": "#FFBB2E", "shape": "ellipse", "size": 12 },
+        { "id": "2:6", "color": "#50C846", "shape": "ellipse", "size": 12 }
+      ],
+      "gap": 8
+    },
+    "module_tab_bar": {
+      "node_id": "2:77",
+      "name": "Module Tab Bar",
+      "type": "frame",
+      "layout": "horizontal",
+      "width": "fill_container",
+      "height": 48,
+      "fills": "#FFFFFF",
+      "border_bottom": "1px #E7E7EA",
+      "primary_axis": "SPACE_BETWEEN",
+      "padding": { "left": 24, "right": 24 },
+      "tabs": [
+        { "id": "2:78", "label": "站点资源抓取", "state": "active", "icon": "arrow.down.to.line", "icon_svg_inline": "down_arrow_icon" },
+        { "id": "2:83", "label": "批量重命名", "state": "disabled", "icon": "arrow.triangle.2.circlepath", "badge": "即将上线" },
+        { "id": "2:88", "label": "资源整理", "state": "disabled", "icon": "square.grid.2x2", "badge": "即将上线" },
+        { "id": "2:93", "label": "设置", "state": "disabled", "icon": "gearshape" }
+      ],
+      "meta": { "id": "2:98", "label": "v0.1 · 单模块预览", "icon": "sparkles" }
+    },
+    "body": {
+      "node_id": "2:9",
+      "name": "Body",
+      "type": "frame",
+      "layout": "vertical",
+      "padding": { "top": 20, "bottom": 20, "left": 48, "right": 48 },
+      "gap": 20,
+      "items": ["2:10", "2:20"]
+    },
+    "hero_block": {
+      "node_id": "2:10",
+      "name": "Hero Block",
+      "type": "frame",
+      "layout": "vertical",
+      "width": 560,
+      "align": "center",
+      "gap": 8,
+      "padding_bottom": 20,
+      "items": ["2:11", "2:18", "2:19"]
+    },
+    "brand_mark": {
+      "node_id": "2:11",
+      "name": "Brand Mark",
+      "items": ["2:12", "2:17"],
+      "gap": 10,
+      "logo": { "id": "2:12", "size": 36, "radius": 10, "fill": "#5046E5" },
+      "name": { "id": "2:17", "text": "WebHarvest", "size": 20, "weight": "bold" }
+    },
+    "hero_title": { "id": "2:18", "text": "抓取整站资源,一步到位", "size": 32, "weight": "bold", "align": "center" },
+    "hero_subtitle": { "id": "2:19", "text": "输入网址,选择文件类型,即可批量下载该域名下的所有图片、视频与 PDF。", "size": 14, "weight": "regular", "color": "#6B6B8A", "align": "center" },
+    "input_card": {
+      "node_id": "2:20",
+      "name": "Input Card",
+      "type": "frame",
+      "layout": "vertical",
+      "width": 640,
+      "fills": "#FFFFFF",
+      "radius": 16,
+      "border": "1px #E7E7EA",
+      "shadow": ["card", "card_inner"],
+      "padding": { "top": 24, "bottom": 24, "left": 32, "right": 32 },
+      "gap": 20,
+      "items": ["2:21", "2:28", "2:52", "2:61", "2:62"]
+    },
+    "url_field": {
+      "node_id": "2:21",
+      "name": "URL Field",
+      "type": "frame",
+      "layout": "vertical",
+      "label": { "id": "2:22", "text": "目标网址", "size": 13, "weight": "semibold" },
+      "input": {
+        "id": "2:23",
+        "name": "URL Input",
+        "height": 48,
+        "radius": 10,
+        "fills": "#F9FAFE",
+        "border": "1px #D8DCE8",
+        "padding": { "left": 14, "right": 14 },
+        "icon_left": { "id": "2:24", "type": "svg", "glyph": "link" },
+        "placeholder": { "id": "2:26", "text": "https://example.com", "color": "#9498AB" },
+        "caret": { "id": "2:27", "color": "#5046E5", "width": 2, "height": 20 }
+      }
+    },
+    "types_field": {
+      "node_id": "2:28",
+      "name": "Types Field",
+      "type": "frame",
+      "layout": "vertical",
+      "label": { "id": "2:29", "text": "文件类型", "size": 13, "weight": "semibold" },
+      "chips_row": {
+        "id": "2:30",
+        "gap": 10,
+        "items": [
+          {
+            "id": "2:31",
+            "label": "图片",
+            "state": "on",
+            "icon_svg_inline": "image_icon",
+            "fill": "#F2F2FE",
+            "border": "1px rgba(80,70,229,0.25)",
+            "text_color": "#5046E5"
+          },
+          {
+            "id": "2:39",
+            "label": "视频",
+            "state": "on",
+            "icon_svg_inline": "video_icon",
+            "fill": "#F2F2FE",
+            "border": "1px rgba(80,70,229,0.25)",
+            "text_color": "#5046E5"
+          },
+          {
+            "id": "2:46",
+            "label": "PDF",
+            "state": "off",
+            "icon_svg_inline": "pdf_icon",
+            "fill": "#FFFFFF",
+            "border": "1px #D8DCE8",
+            "text_color": "#6B6B8A"
+          }
+        ]
+      }
+    },
+    "save_path_field": {
+      "node_id": "2:52",
+      "name": "Save Path Field",
+      "label": { "id": "2:53", "text": "存储目录", "size": 13, "weight": "semibold" },
+      "picker": {
+        "id": "2:54",
+        "gap": 8,
+        "path_display": {
+          "id": "2:55",
+          "height": 48,
+          "radius": 10,
+          "fills": "#F9FAFE",
+          "border": "1px #D8DCE8",
+          "padding": { "left": 14, "right": 14 },
+          "icon": { "id": "2:56", "type": "svg", "glyph": "folder" },
+          "path_text": { "id": "2:58", "text": "~/Downloads/WebHarvest", "color": "#1A1A2E" }
+        },
+        "browse_button": {
+          "id": "2:59",
+          "label": "更改",
+          "type": "secondary",
+          "height": 48,
+          "radius": 10,
+          "fills": "#F9FAFE",
+          "border": "1px #D8DCE8"
+        }
+      }
+    },
+    "divider": { "id": "2:61", "type": "rectangle", "height": 1, "color": "#E7E7EA" },
+    "action_row": {
+      "node_id": "2:62",
+      "name": "Action Row",
+      "type": "frame",
+      "layout": "horizontal",
+      "primary_axis": "SPACE_BETWEEN",
+      "items": ["2:63", "2:68"]
+    },
+    "hint": {
+      "id": "2:63",
+      "icon": { "id": "2:64", "glyph": "lock" },
+      "text": { "id": "2:67", "content": "仅下载该域名下公开可访问的资源", "color": "#9498AB", "size": 12 }
+    },
+    "button_group": {
+      "id": "2:68",
+      "gap": 10,
+      "items": ["2:69", "2:73"]
+    },
+    "stop_button": {
+      "id": "2:69",
+      "label": "停止",
+      "type": "secondary",
+      "height": 44,
+      "radius": 10,
+      "fills": "#FFFFFF",
+      "border": "1px #D8DCE8",
+      "icon_svg_inline": "square_icon",
+      "icon_color": "#1A1A2E",
+      "running_variant": { "border": "1px #FF6B9D", "text_color": "#FF6B9D" }
+    },
+    "start_button": {
+      "id": "2:73",
+      "label": "开始下载",
+      "type": "primary",
+      "height": 44,
+      "radius": 10,
+      "fills": "#5046E5",
+      "text_color": "#FFFFFF",
+      "icon_svg_inline": "download_icon",
+      "shadow": "button_primary",
+      "disabled_variant": { "fills": "#D8DCE8", "shadow": "none" }
+    }
+  },
+  "interaction": {
+    "url_input": {
+      "placeholder": "https://example.com",
+      "validation_regex": "^https?://[^\\s]+$",
+      "focus_border": "1.5px #5046E5",
+      "error_border": "1.5px #FF6B9D",
+      "error_toast": "请输入以 http:// 或 https:// 开头的网址"
+    },
+    "chip_toggle": {
+      "on": { "fill": "#F2F2FE", "border": "1px rgba(80,70,229,0.25)", "text": "#5046E5", "checkbox_fill": "#5046E5", "checkbox_check": "#FFFFFF" },
+      "off": { "fill": "#FFFFFF", "border": "1px #D8DCE8", "text": "#6B6B8A", "checkbox_fill": "#FFFFFF", "checkbox_border": "1.5px #B0B4C0" }
+    },
+    "start_button": {
+      "default": { "fills": "#5046E5", "text": "#FFFFFF" },
+      "hover": { "fills": "#4038C7" },
+      "pressed": { "fills": "#3631A8" },
+      "disabled": { "fills": "#D8DCE8", "text": "#9498AB" }
+    },
+    "stop_button": {
+      "default": { "fills": "#FFFFFF", "border": "1px #D8DCE8", "text": "#1A1A2E" },
+      "running": { "fills": "#FFFFFF", "border": "1px #FF6B9D", "text": "#FF6B9D" },
+      "hover": { "border": "1px #1A1A2E" }
+    },
+    "tab": {
+      "active": { "fill": "#F2F2FE", "text": "#5046E5", "weight": "semibold" },
+      "disabled": { "fill": "transparent", "text": "#9498AB", "weight": "medium", "cursor": "not-allowed" }
+    }
+  },
+  "icons": {
+    "down_arrow_icon": "<svg width='16' height='16' viewBox='0 0 16 16'><path d='M8 2v8M8 2L5 5M8 2l3 3M3 10.5V12a1 1 0 001 1h8a1 1 0 001-1v-1.5' stroke='#5046E5' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/></svg>",
+    "link_icon": "<svg width='18' height='18'><path d='M8.5 4.5h-2a4 4 0 000 8h2M9.5 12.5h2a4 4 0 000-8h-2M7 9h4' stroke='#6B6B8A' stroke-width='1.5' stroke-linecap='round'/></svg>",
+    "image_icon": "<svg width='18' height='18'><rect x='2' y='3' width='14' height='12' rx='2' stroke='#5046E5'/><circle cx='5.5' cy='7' r='1.25' fill='#5046E5'/><path d='M2 13l3-3 3 2 4-4 4 3' stroke='#5046E5' stroke-linejoin='round'/></svg>",
+    "video_icon": "<svg width='18' height='18'><rect x='2' y='3.5' width='14' height='10' rx='2' stroke='#5046E5'/><path d='M7.5 6.5l4 2.5-4 2.5v-5z' fill='#5046E5'/></svg>",
+    "pdf_icon": "<svg width='18' height='18'><path d='M4 2.5h6l4 4v9a1 1 0 01-1 1H4a1 1 0 01-1-1v-12a1 1 0 011-1z' stroke='#6B6B8A'/><path d='M10 2.5v4h4' stroke='#6B6B8A'/></svg>",
+    "folder_icon": "<svg width='18' height='18'><path d='M2 5.5a1 1 0 011-1h3.5l1.5 1.5h7a1 1 0 011 1V13a1 1 0 01-1 1H3a1 1 0 01-1-1V5.5z' stroke='#6B6B8A'/></svg>",
+    "lock_icon": "<svg width='14' height='14'><rect x='2.5' y='6' width='9' height='6.5' rx='1.5' stroke='#9498AB'/><path d='M4.5 6V4a2.5 2.5 0 015 0v2' stroke='#9498AB'/></svg>",
+    "square_icon": "<svg width='14' height='14'><rect x='2.5' y='2.5' width='9' height='9' rx='1.5' fill='#1A1A2E'/></svg>",
+    "download_icon": "<svg width='16' height='16'><path d='M8 2v10M8 2l-3 3M8 2l3 3M3 13h10' stroke='white' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/></svg>"
+  },
+  "fonts_required": [
+    { "family": "Inter", "weights": ["Regular", "Medium", "SemiBold", "Bold"] }
+  ]
+}
