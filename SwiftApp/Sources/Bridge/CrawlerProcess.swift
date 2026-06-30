@@ -12,18 +12,39 @@ final class CrawlerProcess {
 
     var onEvent: ((CrawlerEvent) -> Void)?
 
+    /// Write diagnostics to ~/Desktop/WebHarvest.log for troubleshooting
+    private static let diagURL = URL(fileURLWithPath: "~/Desktop/WebHarvest.log").standardizedFileURL
+
+    private static func diag(_ msg: String) {
+        let line = "[\(Date().ISO8601Format())] \(msg)\n"
+        guard let data = line.data(using: .utf8) else { return }
+        if FileManager.default.fileExists(atPath: diagURL.path) {
+            if var existing = try? Data(contentsOf: diagURL) {
+                existing.append(data)
+                try? existing.write(to: diagURL)
+            }
+        } else {
+            try? data.write(to: diagURL)
+        }
+    }
+
     func start(config: CrawlConfig) {
         stop()
 
-        // Surface early feedback immediately
+        Self.diag("=== start() called ===")
+        Self.diag("url=\(config.url) types=\(config.types.map(\.rawValue)) path=\(config.savePath.path)")
+
         onEvent?(.phase("正在启动 Python 子进程..."))
 
+        let pythonURL = Self.pythonURL()
+        Self.diag("python path: \(pythonURL.path)")
+        Self.diag("python exists: \(FileManager.default.fileExists(atPath: pythonURL.path))")
+
         let proc = Process()
-        proc.executableURL = Self.pythonURL()
+        proc.executableURL = pythonURL
         proc.arguments = ["-m", "webharvest"]
 
         // Set PYTHONPATH so embedded Python finds webharvest + deps
-        // NB: do NOT set PYTHONHOME — PBS is self-contained and PYTHONHOME breaks its internal paths
         var env = ProcessInfo.processInfo.environment
         let bundlePath = Bundle.main.bundlePath
         let sitePackages = bundlePath
@@ -31,6 +52,9 @@ final class CrawlerProcess {
         let existing = env["PYTHONPATH"] ?? ""
         env["PYTHONPATH"] = "\(sitePackages):\(existing)"
         proc.environment = env
+
+        Self.diag("PYTHONPATH=\(sitePackages)")
+        Self.diag("webharvest dir exists: \(FileManager.default.fileExists(atPath: sitePackages + "/webharvest"))")
 
         let stdinPipe = Pipe()
         let stdoutPipe = Pipe()
@@ -40,16 +64,19 @@ final class CrawlerProcess {
         proc.standardError = stderrPipe
 
         proc.terminationHandler = { [weak self] p in
-            self?.log.info("Python exited with status \(p.terminationStatus)")
-            if p.terminationStatus != 0 {
-                // Capture stderr on crash
+            let status = p.terminationStatus
+            Self.diag("Python exited: status=\(status)")
+            self?.log.info("Python exited with status \(status)")
+            if status != 0 {
                 if let stderr = self?.stderr {
                     let data = stderr.fileHandleForReading.readDataToEndOfFile()
                     if let msg = String(data: data, encoding: .utf8), !msg.isEmpty {
+                        Self.diag("Python stderr: \(msg)")
                         self?.log.error("python stderr: \(msg, privacy: .public)")
                         self?.onEvent?(.error("Python 崩溃: \(msg.prefix(200))"))
                     } else {
-                        self?.onEvent?(.error("Python 子进程异常退出 (status=\(p.terminationStatus))"))
+                        Self.diag("Python exit with no stderr")
+                        self?.onEvent?(.error("Python 子进程异常退出 (status=\(status))"))
                     }
                 }
             }
@@ -57,8 +84,10 @@ final class CrawlerProcess {
 
         do {
             try proc.run()
+            Self.diag("Python launched OK")
             log.info("Python process launched at \(Self.pythonURL().path)")
         } catch {
+            Self.diag("proc.run() failed: \(error.localizedDescription)")
             onEvent?(.error("启动 Python 失败: \(error.localizedDescription)"))
             return
         }
@@ -68,15 +97,15 @@ final class CrawlerProcess {
         self.stdout = stdoutPipe
         self.stderr = stderrPipe
 
-        // Forward stderr lines as error events so the user can see Python tracebacks
+        // Forward stderr lines as error events
         stderrPipe.fileHandleForReading.readabilityHandler = { [weak self] fh in
             let data = fh.availableData
             guard let s = String(data: data, encoding: .utf8), !s.isEmpty else { return }
             for line in s.split(separator: "\n") {
                 let trimmed = line.trimmingCharacters(in: .whitespaces)
                 if trimmed.isEmpty { continue }
+                Self.diag("stderr: \(trimmed)")
                 self?.log.error("python stderr: \(trimmed, privacy: .public)")
-                // Surface to UI — but throttle by not flooding
                 if trimmed.count < 300 {
                     self?.onEvent?(.error(trimmed))
                 }
@@ -86,6 +115,7 @@ final class CrawlerProcess {
         readLoop(handle: stdoutPipe.fileHandleForReading)
         send(.start(config: config))
         log.info("Crawler started: \(config.url)")
+        Self.diag("send start command")
     }
 
     func stop() {
@@ -97,6 +127,7 @@ final class CrawlerProcess {
         stdin = nil
         stdout = nil
         stderr = nil
+        Self.diag("stop() called")
     }
 
     // MARK: - Internal
@@ -144,6 +175,7 @@ final class CrawlerProcess {
                 do {
                     try stdin.fileHandleForWriting.write(contentsOf: payload)
                 } catch {
+                    Self.diag("stdin write error: \(error.localizedDescription)")
                     self.log.error("stdin write failed: \(error.localizedDescription)")
                     self.onEvent?(.error("stdin 写入失败"))
                 }
@@ -209,7 +241,7 @@ final class CrawlerProcess {
         }
         let bundlePath = Bundle.main.bundlePath
         // PBS ships python3.11, not python3
-        return URL(fileURLWithPath: bundlePath)
-            .appending(path: "Contents/Resources/python/bin/python3.11")
+        let path = bundlePath + "/Contents/Resources/python/bin/python3.11"
+        return URL(fileURLWithPath: path)
     }
 }
