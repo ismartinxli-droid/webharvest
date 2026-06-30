@@ -15,15 +15,6 @@ let package = Package(
         .executableTarget(
             name: "WebHarvest",
             path: "SwiftApp/Sources",
-            exclude: [
-                "Info.plist",
-                "README.md",
-                "App/README.md",
-                "Bridge/README.md",
-                "Components/README.md",
-                "Modules/README.md",
-                "Modules/SiteCrawler/README.md"
-            ],
             swiftSettings: [
                 .unsafeFlags(["-parse-as-library"])
             ]
