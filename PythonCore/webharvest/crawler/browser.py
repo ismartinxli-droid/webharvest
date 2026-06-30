@@ -58,6 +58,12 @@ async def extract_asset_urls(target_url: str) -> tuple[set[str], dict[str, str],
                         body = await resp.body()
                         if body and len(body) > 100:
                             saved_bodies[resp.url] = body
+                            # For ampmake CDN: also store under clean URL (without @d_progressive)
+                            # so the downloader picks up the original-quality version.
+                            if resp.url.endswith("@d_progressive"):
+                                clean_url = resp.url[:-len("@d_progressive")]
+                                if clean_url not in saved_bodies:
+                                    saved_bodies[clean_url] = body
                     except Exception:
                         pass
 
@@ -66,7 +72,16 @@ async def extract_asset_urls(target_url: str) -> tuple[set[str], dict[str, str],
                  if req.resource_type in ("image", "media", "font") else None)
 
         await page.goto(target_url, wait_until="domcontentloaded", timeout=60000)
-        await page.wait_for_timeout(5000)  # let lazy-loaders fire (5s for SPAs)
+        await page.wait_for_timeout(3000)  # let initial JS render
+
+        # Scroll to trigger lazy-loaded images (many SPAs load images on scroll).
+        # lixiang.com and similar sites only render product images when scrolled into view.
+        page_height = await page.evaluate("() => document.body.scrollHeight")
+        for y in range(0, min(page_height, 20000), 500):
+            await page.evaluate(f"window.scrollTo(0, {y})")
+            await page.wait_for_timeout(100)
+        await page.evaluate("window.scrollTo(0, 0)")
+        await page.wait_for_timeout(1500)  # let scroll-triggered images load
 
         # Extract @font-face URLs and download fonts via page context.
         # Python Playwright does not fire response events with resource_type="font"
@@ -76,12 +91,20 @@ async def extract_asset_urls(target_url: str) -> tuple[set[str], dict[str, str],
         for url, body in font_bodies.items():
             saved_bodies[url] = body
 
-        # Extract all img/src attributes from DOM
+        # Extract all img/src attributes from DOM, PLUS computed background images.
+        # Many modern sites (e.g. lixiang.com) render car/product photos as CSS
+        # background images rather than <img> tags.
         dom_urls = await page.evaluate("""() => {
             const s = new Set();
+            const IMG_EXTS = /\\.(jpg|jpeg|png|gif|webp|pdf|mp4|mov|bmp|svg|ico|tiff?)(\\?|$)/i;
+
+            // --- <img> tags ---
             document.querySelectorAll('img[src]').forEach(el => { if (el.src) s.add(el.src); });
             document.querySelectorAll('img[data-src]').forEach(el => { if (el.dataset.src) s.add(el.dataset.src); });
             document.querySelectorAll('img[data-lazy-src]').forEach(el => { if (el.dataset.lazySrc) s.add(el.dataset.lazySrc); });
+            document.querySelectorAll('img[data-original]').forEach(el => { if (el.dataset.original) s.add(el.dataset.original); });
+
+            // --- <picture> / <source> ---
             document.querySelectorAll('source[srcset]').forEach(el => {
                 el.srcset.split(',').forEach(p => {
                     const u = p.trim().split(' ')[0];
@@ -89,12 +112,17 @@ async def extract_asset_urls(target_url: str) -> tuple[set[str], dict[str, str],
                 });
             });
             document.querySelectorAll('source[src]').forEach(el => { if (el.src) s.add(el.src); });
+
+            // --- <video> ---
             document.querySelectorAll('video[src]').forEach(el => { if (el.src) s.add(el.src); });
             document.querySelectorAll('video[poster]').forEach(el => { if (el.poster) s.add(el.poster); });
+
+            // --- <a href> with image/video extensions ---
             document.querySelectorAll('a[href]').forEach(el => {
-                const h = el.href.toLowerCase();
-                if (h.match(/\\.(jpg|jpeg|png|gif|webp|pdf|mp4|mov|bmp|svg|ico)(\\?|$)/)) s.add(el.href);
+                if (IMG_EXTS.test(el.href)) s.add(el.href);
             });
+
+            // --- Inline style background images ---
             document.querySelectorAll('[style]').forEach(el => {
                 const bg = el.style.backgroundImage;
                 if (bg) {
@@ -102,6 +130,27 @@ async def extract_asset_urls(target_url: str) -> tuple[set[str], dict[str, str],
                     if (m) s.add(m[1]);
                 }
             });
+
+            // --- Computed background images (catches CSS class-based backgrounds,
+            //     which is how lixiang.com renders all car photos) ---
+            const seenBg = new Set();
+            document.querySelectorAll('div, section, article, header, footer, li, a, span').forEach(el => {
+                try {
+                    const bg = getComputedStyle(el).backgroundImage;
+                    if (!bg || bg === 'none') return;
+                    const matches = bg.match(/url\\(["']?([^"')]+)["']?\\)/g);
+                    if (!matches) return;
+                    matches.forEach(m => {
+                        const url = m.replace(/url\\(["']?/, '').replace(/["']?\\)/, '');
+                        if (url && !url.startsWith('data:') && !seenBg.has(url)) {
+                            seenBg.add(url);
+                            s.add(url);
+                        }
+                    });
+                } catch(e) {}
+            });
+
+            // --- <meta> og:image / twitter:image ---
             document.querySelectorAll('meta[property],meta[name]').forEach(el => {
                 const p = (el.getAttribute('property') || '').toLowerCase();
                 const n = (el.getAttribute('name') || '').toLowerCase();
@@ -110,12 +159,18 @@ async def extract_asset_urls(target_url: str) -> tuple[set[str], dict[str, str],
                     if (c && c.startsWith('http')) s.add(c);
                 }
             });
+
             return Array.from(s);
         }""")
 
         for u in dom_urls:
             if u and not u.startswith("data:"):
                 urls.add(u)
+                # For ampmake CDN: if URL has @d_progressive suffix, also add the
+                # clean version (without the suffix) to get original-quality image.
+                # Example: .../image.jpg@d_progressive → .../image.jpg (original)
+                if u.endswith("@d_progressive"):
+                    urls.add(u[:-len("@d_progressive")])
 
         # Extract cookies
         raw_cookies = await context.cookies()
