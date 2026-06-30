@@ -34,8 +34,12 @@ jobs:
 
       - name: Build Swift app (release, arm64 only)
         run: |
+          set -x
+          which swift
+          swift --version
           swift build -c release --arch arm64
           ls -la .build/arm64-apple-macosx/release/WebHarvest
+          echo "BINARY=.build/arm64-apple-macosx/release/WebHarvest" >> $GITHUB_ENV
 
       - name: Assemble .app bundle
         run: |
@@ -47,8 +51,8 @@ jobs:
           mkdir -p dist/WebHarvest.app/Contents/Resources
           
           # copy binary
-          cp .build/arm64-apple-macosx/release/WebHarvest dist/WebHarvest.app/Contents/MacOS/WebHarvest
-          
+          cp "$BINARY" dist/WebHarvest.app/Contents/MacOS/WebHarvest
+
           # copy Info.plist
           cp SwiftApp/Resources/Info.plist dist/WebHarvest.app/Contents/Info.plist
           

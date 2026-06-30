@@ -30,5 +30,9 @@ jobs:
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
+      - name: Show toolchain
+        run: |
+          which swift
+          swift --version
       - name: Build (arm64)
         run: swift build -c release --arch arm64
