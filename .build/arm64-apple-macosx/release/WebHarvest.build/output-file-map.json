@@ -28,12 +28,6 @@
     "swift-dependencies": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/WebHarvestApp.swiftdeps",
     "diagnostics": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/WebHarvestApp.dia"
   },
-  "/Users/lixi/Workbuddy/2026-06-30-10-54-59/SwiftApp/Sources/App/WindowAccessor.swift": {
-    "object": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/WindowAccessor.swift.o",
-    "swiftmodule": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/WindowAccessor~partial.swiftmodule",
-    "swift-dependencies": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/WindowAccessor.swiftdeps",
-    "diagnostics": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/WindowAccessor.dia"
-  },
   "/Users/lixi/Workbuddy/2026-06-30-10-54-59/SwiftApp/Sources/Bridge/CrawlerMessages.swift": {
     "object": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/CrawlerMessages.swift.o",
     "swiftmodule": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/CrawlerMessages~partial.swiftmodule",
