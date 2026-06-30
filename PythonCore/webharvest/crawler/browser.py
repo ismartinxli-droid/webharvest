@@ -19,9 +19,13 @@ _CHROME_ARGS = [
 ]
 
 
-async def extract_asset_urls(target_url: str) -> tuple[set[str], dict[str, str]]:
-    """Load a page in headless Chromium, wait for JS + lazy assets, return (all_urls, cookies_dict)."""
+async def extract_asset_urls(target_url: str) -> tuple[set[str], dict[str, str], dict[str, bytes]]:
+    """Load a page in headless Chromium, wait for JS + lazy assets, return (all_urls, cookies_dict, saved_bodies).
+    saved_bodies contains the raw bytes of font/image/media responses captured during page load,
+    which is the only reliable way to get WAF-protected assets (they load fine in Chrome's page context
+    but fail with HTTP 567 when httpx or Chrome-in-isolation requests them)."""
     urls: set[str] = set()
+    saved_bodies: dict[str, bytes] = {}
 
     async with async_playwright() as pw:
         browser = await pw.chromium.launch(channel="chrome", headless=True, args=_CHROME_ARGS)
@@ -40,12 +44,22 @@ async def extract_asset_urls(target_url: str) -> tuple[set[str], dict[str, str]]
             Object.defineProperty(navigator, 'languages', { get: () => ['zh-CN', 'zh', 'en'] });
         """)
 
-        # Capture image/media/font responses
-        def _on_resp(resp):
+        # Capture image/media/font responses AND save their bodies.
+        # This is critical: WAF-protected assets (HTTP 567) can only be retrieved
+        # during the initial page load when Chrome has the full page context.
+        async def _on_resp(resp):
             rt = resp.request.resource_type
             if rt in ("image", "media", "font") and resp.ok:
                 if resp.url not in urls:
                     urls.add(resp.url)
+                # Save body for CDN/WAF-protected assets
+                if resp.url not in saved_bodies:
+                    try:
+                        body = await resp.body()
+                        if body and len(body) > 100:
+                            saved_bodies[resp.url] = body
+                    except Exception:
+                        pass
 
         page.on("response", _on_resp)
         page.on("requestfailed", lambda req: urls.add(req.url)
@@ -107,7 +121,7 @@ async def extract_asset_urls(target_url: str) -> tuple[set[str], dict[str, str]]
 
         await browser.close()
 
-    return urls, cookies
+    return urls, cookies, saved_bodies
 
 
 async def download_assets_via_playwright(

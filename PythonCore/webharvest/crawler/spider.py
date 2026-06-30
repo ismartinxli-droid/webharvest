@@ -53,11 +53,12 @@ async def run(url: str, types: set[str], save_path: str, max_depth: int = 3) -> 
     # Playwright-discovered assets will be silently skipped.
     browser_urls: set[str] = set()
     browser_cookies: dict[str, str] = {}
+    saved_bodies: dict[str, bytes] = {}  # bodies captured during Playwright page load
     try:
         from .browser import extract_asset_urls as browser_extract
 
         emit("phase", name="launching Chromium...")
-        browser_urls, browser_cookies = await browser_extract(url)
+        browser_urls, browser_cookies, saved_bodies = await browser_extract(url)
         emit("phase", name=f"Chromium found {len(browser_urls)} resources")
     except ImportError:
         emit("phase", name="Playwright not available, using static parser")
@@ -282,12 +283,57 @@ async def run(url: str, types: set[str], save_path: str, max_depth: int = 3) -> 
 
             emit("pages.crawled", count=len(seen_pages))
 
-        # First, download all assets discovered by Playwright.
-        # These were NOT added to seen_assets (see note above), so try_download
-        # will actually download them.
-        if browser_urls:
-            emit("phase", name=f"Downloading {len(browser_urls)} Playwright-discovered assets...")
-            for asset_url in list(browser_urls):
+        # First, save all assets captured during Playwright page load.
+        # These bodies were downloaded by Chrome with full page context (cookies, referer, JS)
+        # and cannot be fetched by httpx (WAF blocks with HTTP 567).
+        pw_saved = 0
+        if saved_bodies:
+            emit("phase", name=f"Saving {len(saved_bodies)} Playwright-captured asset bodies...")
+            for asset_url, body in saved_bodies.items():
+                if asset_url in seen_assets:
+                    continue
+                seen_assets.add(asset_url)
+                # Determine content-type and type from response headers
+                # We don't have headers, so use URL extension as fallback
+                from ..config import FOLDER_BY_TYPE, IMAGE_EXTS, VIDEO_EXTS, FONT_EXTS
+                url_lower = asset_url.lower()
+                ftype = None
+                for ext in IMAGE_EXTS:
+                    if f".{ext}" in url_lower or f".{ext}?" in url_lower:
+                        ftype = "image"
+                        break
+                if ftype is None:
+                    for ext in VIDEO_EXTS:
+                        if f".{ext}" in url_lower or f".{ext}?" in url_lower:
+                            ftype = "video"
+                            break
+                if ftype is None:
+                    for ext in FONT_EXTS:
+                        if f".{ext}" in url_lower or f".{ext}?" in url_lower:
+                            ftype = "font"
+                            break
+                if ftype is None or ftype not in types:
+                    continue
+                # Derive filename from URL
+                path_part = urlparse(asset_url).path
+                name = path_part.rsplit("/", 1)[-1] if "/" in path_part else "asset"
+                name = unquote(name)
+                name = _safe(name)
+                dest_dir = Path(save_path) / FOLDER_BY_TYPE[ftype]
+                dest_dir.mkdir(parents=True, exist_ok=True)
+                (dest_dir / name).write_bytes(body)
+                pw_saved += 1
+                downloaded += 1
+                emit("asset.downloaded", type=ftype, path=str(dest_dir / name), size=len(body))
+            emit("phase", name=f"Playwright captured {pw_saved} assets directly")
+
+        # Next, download Playwright-discovered assets via httpx (non-WAF ones).
+        # Playwright-captured bodies are already saved and added to seen_assets,
+        # so try_download will skip them.
+        remaining_urls = [u for u in browser_urls if u not in seen_assets]
+        if remaining_urls:
+            emit("phase", name=f"Downloading {len(remaining_urls)} remaining assets via HTTP...")
+            for asset_url in remaining_urls:
                 await try_download(asset_url)
 
         # BFS layer by layer
