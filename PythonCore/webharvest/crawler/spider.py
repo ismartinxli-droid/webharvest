@@ -24,6 +24,7 @@ _MAX_ASSETS = 5000
 _CT_IMAGE = ("image/",)
 _CT_VIDEO = ("video/",)
 _CT_PDF = ("application/pdf",)
+_CT_FONT = ("font/", "application/x-font", "application/font")
 
 
 async def run(url: str, types: set[str], save_path: str, max_depth: int = 3) -> None:
@@ -117,6 +118,8 @@ async def run(url: str, types: set[str], save_path: str, max_depth: int = 3) -> 
                     ftype = "video"
                 elif any(ct.startswith(p) for p in _CT_PDF):
                     ftype = "pdf"
+                elif any(ct.startswith(p) for p in _CT_FONT):
+                    ftype = "font"
 
                 if ftype is None or ftype not in types:
                     failed += 1
@@ -352,6 +355,10 @@ def _ct_to_ext(content_type: str) -> str:
         "video/mp4": "mp4", "video/webm": "webm", "video/quicktime": "mov",
         "video/x-msvideo": "avi", "video/x-matroska": "mkv",
         "application/pdf": "pdf",
+        "font/ttf": "ttf", "font/otf": "otf", "font/woff": "woff",
+        "font/woff2": "woff2", "application/x-font-ttf": "ttf",
+        "application/x-font-otf": "otf", "application/font-woff": "woff",
+        "application/font-woff2": "woff2",
     }
     ct = content_type.lower().split(";")[0].strip()
     return ct_map.get(ct, "")

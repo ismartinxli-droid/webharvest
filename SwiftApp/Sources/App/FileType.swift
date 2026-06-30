@@ -1,7 +1,7 @@
 import Foundation
 
 enum FileType: String, CaseIterable, Codable, Hashable, Identifiable {
-    case image, video, pdf
+    case image, video, pdf, font
 
     var id: String { rawValue }
 
@@ -10,6 +10,7 @@ enum FileType: String, CaseIterable, Codable, Hashable, Identifiable {
         case .image: "图片"
         case .video: "视频"
         case .pdf: "PDF"
+        case .font: "字体"
         }
     }
 
@@ -18,6 +19,7 @@ enum FileType: String, CaseIterable, Codable, Hashable, Identifiable {
         case .image: "photo"
         case .video: "video"
         case .pdf: "doc.richtext"
+        case .font: "textformat"
         }
     }
 
@@ -26,6 +28,7 @@ enum FileType: String, CaseIterable, Codable, Hashable, Identifiable {
         case .image: "images"
         case .video: "videos"
         case .pdf: "pdfs"
+        case .font: "fonts"
         }
     }
 
@@ -34,6 +37,7 @@ enum FileType: String, CaseIterable, Codable, Hashable, Identifiable {
         case .image: ["jpg", "jpeg", "png", "gif", "webp", "bmp", "svg", "tiff", "avif", "heic"]
         case .video: ["mp4", "mov", "webm", "mkv", "avi", "m4v", "flv"]
         case .pdf: ["pdf"]
+        case .font: ["ttf", "otf", "woff", "woff2", "eot"]
         }
     }
 }

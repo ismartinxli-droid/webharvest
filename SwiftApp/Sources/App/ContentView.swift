@@ -11,6 +11,7 @@ struct ContentView: View {
             ModuleRouterView()
         }
         .background(Color.backgroundPage)
+        .background(WindowAccessor())
     }
 }
 

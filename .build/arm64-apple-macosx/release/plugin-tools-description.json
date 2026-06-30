@@ -40,6 +40,10 @@
         },
         {
           "kind" : "file",
+          "name" : "/Users/lixi/Workbuddy/2026-06-30-10-54-59/SwiftApp/Sources/App/WindowAccessor.swift"
+        },
+        {
+          "kind" : "file",
           "name" : "/Users/lixi/Workbuddy/2026-06-30-10-54-59/SwiftApp/Sources/Bridge/CrawlerMessages.swift"
         },
         {
@@ -107,6 +111,7 @@
         "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/ContentView.swift.o",
         "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/FileType.swift.o",
         "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/WebHarvestApp.swift.o",
+        "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/WindowAccessor.swift.o",
         "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/CrawlerMessages.swift.o",
         "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/CrawlerProcess.swift.o",
         "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/Color+Tokens.swift.o",
@@ -183,6 +188,10 @@
         },
         {
           "kind" : "file",
+          "name" : "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/WindowAccessor.swift.o"
+        },
+        {
+          "kind" : "file",
           "name" : "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/CrawlerMessages.swift.o"
         },
         {
@@ -244,6 +253,7 @@
         "/Users/lixi/Workbuddy/2026-06-30-10-54-59/SwiftApp/Sources/App/ContentView.swift",
         "/Users/lixi/Workbuddy/2026-06-30-10-54-59/SwiftApp/Sources/App/FileType.swift",
         "/Users/lixi/Workbuddy/2026-06-30-10-54-59/SwiftApp/Sources/App/WebHarvestApp.swift",
+        "/Users/lixi/Workbuddy/2026-06-30-10-54-59/SwiftApp/Sources/App/WindowAccessor.swift",
         "/Users/lixi/Workbuddy/2026-06-30-10-54-59/SwiftApp/Sources/Bridge/CrawlerMessages.swift",
         "/Users/lixi/Workbuddy/2026-06-30-10-54-59/SwiftApp/Sources/Bridge/CrawlerProcess.swift",
         "/Users/lixi/Workbuddy/2026-06-30-10-54-59/SwiftApp/Sources/Components/Color+Tokens.swift",
@@ -277,6 +287,7 @@
       "/Users/lixi/Workbuddy/2026-06-30-10-54-59/SwiftApp/Sources/App/ContentView.swift",
       "/Users/lixi/Workbuddy/2026-06-30-10-54-59/SwiftApp/Sources/App/FileType.swift",
       "/Users/lixi/Workbuddy/2026-06-30-10-54-59/SwiftApp/Sources/App/WebHarvestApp.swift",
+      "/Users/lixi/Workbuddy/2026-06-30-10-54-59/SwiftApp/Sources/App/WindowAccessor.swift",
       "/Users/lixi/Workbuddy/2026-06-30-10-54-59/SwiftApp/Sources/Bridge/CrawlerMessages.swift",
       "/Users/lixi/Workbuddy/2026-06-30-10-54-59/SwiftApp/Sources/Bridge/CrawlerProcess.swift",
       "/Users/lixi/Workbuddy/2026-06-30-10-54-59/SwiftApp/Sources/Components/Color+Tokens.swift",
@@ -375,6 +386,10 @@
         {
           "kind" : "file",
           "name" : "/Users/lixi/Workbuddy/2026-06-30-10-54-59/SwiftApp/Sources/App/WebHarvestApp.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/lixi/Workbuddy/2026-06-30-10-54-59/SwiftApp/Sources/App/WindowAccessor.swift"
         },
         {
           "kind" : "file",
@@ -505,6 +520,10 @@
         {
           "kind" : "file",
           "name" : "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/WebHarvestApp.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/WindowAccessor.swift.o"
         }
       ],
       "outputFilePath" : "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.product/Objects.LinkFileList"

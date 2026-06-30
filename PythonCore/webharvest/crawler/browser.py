@@ -23,16 +23,16 @@ async def extract_asset_urls(target_url: str) -> tuple[set[str], dict[str, str]]
         )
         page = await context.new_page()
 
-        # Capture image/media responses
+        # Capture image/media/font responses
         def _on_resp(resp):
             rt = resp.request.resource_type
-            if rt in ("image", "media") and resp.ok:
+            if rt in ("image", "media", "font") and resp.ok:
                 if resp.url not in urls:
                     urls.add(resp.url)
 
         page.on("response", _on_resp)
         page.on("requestfailed", lambda req: urls.add(req.url)
-                 if req.resource_type in ("image", "media") else None)
+                 if req.resource_type in ("image", "media", "font") else None)
 
         await page.goto(target_url, wait_until="networkidle", timeout=30000)
         await page.wait_for_timeout(3000)
@@ -140,6 +140,8 @@ async def download_assets_via_playwright(
                             ftype = "image"
                         elif ct.startswith("video/"):
                             ftype = "video"
+                        elif ct.startswith("font/") or "font" in ct:
+                            ftype = "font"
 
                         if ftype and ftype in file_types:
                             from urllib.parse import urlparse as up
@@ -148,11 +150,13 @@ async def download_assets_via_playwright(
                             if "." not in name:
                                 ext_map = {"image/jpeg": "jpg", "image/png": "png",
                                            "image/webp": "webp", "image/gif": "gif",
-                                           "video/mp4": "mp4"}
+                                           "video/mp4": "mp4",
+                                           "font/ttf": "ttf", "font/otf": "otf",
+                                           "font/woff": "woff", "font/woff2": "woff2"}
                                 name = f"{name}.{ext_map.get(ct, 'bin')}"
                             name = "".join(c for c in name if c.isalnum() or c in "._-")[:120] or "file"
 
-                            type_dir_map = {"image": "images", "video": "videos", "pdf": "pdfs"}
+                            type_dir_map = {"image": "images", "video": "videos", "pdf": "pdfs", "font": "fonts"}
                             save_dir = dest / type_dir_map[ftype]
                             save_dir.mkdir(parents=True, exist_ok=True)
                             (save_dir / name).write_bytes(raw)
