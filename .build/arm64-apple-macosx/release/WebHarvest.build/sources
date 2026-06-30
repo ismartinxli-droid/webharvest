@@ -1,0 +1,17 @@
+/Users/lixi/Workbuddy/2026-06-30-10-54-59/SwiftApp/Sources/App/AppState.swift
+/Users/lixi/Workbuddy/2026-06-30-10-54-59/SwiftApp/Sources/App/ContentView.swift
+/Users/lixi/Workbuddy/2026-06-30-10-54-59/SwiftApp/Sources/App/FileType.swift
+/Users/lixi/Workbuddy/2026-06-30-10-54-59/SwiftApp/Sources/App/WebHarvestApp.swift
+/Users/lixi/Workbuddy/2026-06-30-10-54-59/SwiftApp/Sources/Bridge/CrawlerMessages.swift
+/Users/lixi/Workbuddy/2026-06-30-10-54-59/SwiftApp/Sources/Bridge/CrawlerProcess.swift
+/Users/lixi/Workbuddy/2026-06-30-10-54-59/SwiftApp/Sources/Components/Color+Tokens.swift
+/Users/lixi/Workbuddy/2026-06-30-10-54-59/SwiftApp/Sources/Modules/Module.swift
+/Users/lixi/Workbuddy/2026-06-30-10-54-59/SwiftApp/Sources/Modules/ModuleTabBarView.swift
+/Users/lixi/Workbuddy/2026-06-30-10-54-59/SwiftApp/Sources/Modules/SiteCrawler/ActionRowView.swift
+/Users/lixi/Workbuddy/2026-06-30-10-54-59/SwiftApp/Sources/Modules/SiteCrawler/InputCardView.swift
+/Users/lixi/Workbuddy/2026-06-30-10-54-59/SwiftApp/Sources/Modules/SiteCrawler/LogPanel.swift
+/Users/lixi/Workbuddy/2026-06-30-10-54-59/SwiftApp/Sources/Modules/SiteCrawler/SavePathFieldView.swift
+/Users/lixi/Workbuddy/2026-06-30-10-54-59/SwiftApp/Sources/Modules/SiteCrawler/SiteCrawlerView.swift
+/Users/lixi/Workbuddy/2026-06-30-10-54-59/SwiftApp/Sources/Modules/SiteCrawler/TypesChipsView.swift
+/Users/lixi/Workbuddy/2026-06-30-10-54-59/SwiftApp/Sources/Modules/SiteCrawler/URLFieldView.swift
+/Users/lixi/Workbuddy/2026-06-30-10-54-59/SwiftApp/Sources/Modules/TitleBarView.swift

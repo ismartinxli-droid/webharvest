@@ -14,6 +14,9 @@ struct WebHarvestApp: App {
         .windowResizability(.contentSize)
         .commands {
             CommandGroup(replacing: .newItem) {}
+            // Strip "New Window" and other window-related items
+            CommandGroup(replacing: .windowList) {}
+            CommandGroup(replacing: .windowSize) {}
         }
     }
 }

@@ -1,0 +1,109 @@
+{
+  "": {
+    "dependencies": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/WebHarvest.d",
+    "object": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/WebHarvest.o",
+    "swift-dependencies": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/primary.swiftdeps"
+  },
+  "/Users/lixi/Workbuddy/2026-06-30-10-54-59/SwiftApp/Sources/App/AppState.swift": {
+    "object": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/AppState.swift.o",
+    "swiftmodule": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/AppState~partial.swiftmodule",
+    "swift-dependencies": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/AppState.swiftdeps",
+    "diagnostics": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/AppState.dia"
+  },
+  "/Users/lixi/Workbuddy/2026-06-30-10-54-59/SwiftApp/Sources/App/ContentView.swift": {
+    "object": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/ContentView.swift.o",
+    "swiftmodule": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/ContentView~partial.swiftmodule",
+    "swift-dependencies": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/ContentView.swiftdeps",
+    "diagnostics": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/ContentView.dia"
+  },
+  "/Users/lixi/Workbuddy/2026-06-30-10-54-59/SwiftApp/Sources/App/FileType.swift": {
+    "object": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/FileType.swift.o",
+    "swiftmodule": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/FileType~partial.swiftmodule",
+    "swift-dependencies": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/FileType.swiftdeps",
+    "diagnostics": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/FileType.dia"
+  },
+  "/Users/lixi/Workbuddy/2026-06-30-10-54-59/SwiftApp/Sources/App/WebHarvestApp.swift": {
+    "object": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/WebHarvestApp.swift.o",
+    "swiftmodule": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/WebHarvestApp~partial.swiftmodule",
+    "swift-dependencies": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/WebHarvestApp.swiftdeps",
+    "diagnostics": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/WebHarvestApp.dia"
+  },
+  "/Users/lixi/Workbuddy/2026-06-30-10-54-59/SwiftApp/Sources/Bridge/CrawlerMessages.swift": {
+    "object": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/CrawlerMessages.swift.o",
+    "swiftmodule": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/CrawlerMessages~partial.swiftmodule",
+    "swift-dependencies": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/CrawlerMessages.swiftdeps",
+    "diagnostics": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/CrawlerMessages.dia"
+  },
+  "/Users/lixi/Workbuddy/2026-06-30-10-54-59/SwiftApp/Sources/Bridge/CrawlerProcess.swift": {
+    "object": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/CrawlerProcess.swift.o",
+    "swiftmodule": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/CrawlerProcess~partial.swiftmodule",
+    "swift-dependencies": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/CrawlerProcess.swiftdeps",
+    "diagnostics": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/CrawlerProcess.dia"
+  },
+  "/Users/lixi/Workbuddy/2026-06-30-10-54-59/SwiftApp/Sources/Components/Color+Tokens.swift": {
+    "object": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/Color+Tokens.swift.o",
+    "swiftmodule": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/Color+Tokens~partial.swiftmodule",
+    "swift-dependencies": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/Color+Tokens.swiftdeps",
+    "diagnostics": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/Color+Tokens.dia"
+  },
+  "/Users/lixi/Workbuddy/2026-06-30-10-54-59/SwiftApp/Sources/Modules/Module.swift": {
+    "object": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/Module.swift.o",
+    "swiftmodule": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/Module~partial.swiftmodule",
+    "swift-dependencies": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/Module.swiftdeps",
+    "diagnostics": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/Module.dia"
+  },
+  "/Users/lixi/Workbuddy/2026-06-30-10-54-59/SwiftApp/Sources/Modules/ModuleTabBarView.swift": {
+    "object": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/ModuleTabBarView.swift.o",
+    "swiftmodule": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/ModuleTabBarView~partial.swiftmodule",
+    "swift-dependencies": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/ModuleTabBarView.swiftdeps",
+    "diagnostics": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/ModuleTabBarView.dia"
+  },
+  "/Users/lixi/Workbuddy/2026-06-30-10-54-59/SwiftApp/Sources/Modules/SiteCrawler/ActionRowView.swift": {
+    "object": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/ActionRowView.swift.o",
+    "swiftmodule": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/ActionRowView~partial.swiftmodule",
+    "swift-dependencies": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/ActionRowView.swiftdeps",
+    "diagnostics": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/ActionRowView.dia"
+  },
+  "/Users/lixi/Workbuddy/2026-06-30-10-54-59/SwiftApp/Sources/Modules/SiteCrawler/InputCardView.swift": {
+    "object": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/InputCardView.swift.o",
+    "swiftmodule": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/InputCardView~partial.swiftmodule",
+    "swift-dependencies": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/InputCardView.swiftdeps",
+    "diagnostics": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/InputCardView.dia"
+  },
+  "/Users/lixi/Workbuddy/2026-06-30-10-54-59/SwiftApp/Sources/Modules/SiteCrawler/LogPanel.swift": {
+    "object": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/LogPanel.swift.o",
+    "swiftmodule": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/LogPanel~partial.swiftmodule",
+    "swift-dependencies": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/LogPanel.swiftdeps",
+    "diagnostics": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/LogPanel.dia"
+  },
+  "/Users/lixi/Workbuddy/2026-06-30-10-54-59/SwiftApp/Sources/Modules/SiteCrawler/SavePathFieldView.swift": {
+    "object": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/SavePathFieldView.swift.o",
+    "swiftmodule": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/SavePathFieldView~partial.swiftmodule",
+    "swift-dependencies": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/SavePathFieldView.swiftdeps",
+    "diagnostics": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/SavePathFieldView.dia"
+  },
+  "/Users/lixi/Workbuddy/2026-06-30-10-54-59/SwiftApp/Sources/Modules/SiteCrawler/SiteCrawlerView.swift": {
+    "object": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/SiteCrawlerView.swift.o",
+    "swiftmodule": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/SiteCrawlerView~partial.swiftmodule",
+    "swift-dependencies": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/SiteCrawlerView.swiftdeps",
+    "diagnostics": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/SiteCrawlerView.dia"
+  },
+  "/Users/lixi/Workbuddy/2026-06-30-10-54-59/SwiftApp/Sources/Modules/SiteCrawler/TypesChipsView.swift": {
+    "object": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/TypesChipsView.swift.o",
+    "swiftmodule": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/TypesChipsView~partial.swiftmodule",
+    "swift-dependencies": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/TypesChipsView.swiftdeps",
+    "diagnostics": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/TypesChipsView.dia"
+  },
+  "/Users/lixi/Workbuddy/2026-06-30-10-54-59/SwiftApp/Sources/Modules/SiteCrawler/URLFieldView.swift": {
+    "object": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/URLFieldView.swift.o",
+    "swiftmodule": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/URLFieldView~partial.swiftmodule",
+    "swift-dependencies": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/URLFieldView.swiftdeps",
+    "diagnostics": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/URLFieldView.dia"
+  },
+  "/Users/lixi/Workbuddy/2026-06-30-10-54-59/SwiftApp/Sources/Modules/TitleBarView.swift": {
+    "object": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/TitleBarView.swift.o",
+    "swiftmodule": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/TitleBarView~partial.swiftmodule",
+    "swift-dependencies": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/TitleBarView.swiftdeps",
+    "diagnostics": "/Users/lixi/Workbuddy/2026-06-30-10-54-59/.build/arm64-apple-macosx/release/WebHarvest.build/TitleBarView.dia"
+  }
+}

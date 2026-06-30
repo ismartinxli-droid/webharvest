@@ -1,7 +1,6 @@
 """Download an asset to a typed subfolder with content-disposition fallback."""
 from __future__ import annotations
 
-from hashlib import sha1
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
@@ -10,7 +9,7 @@ import httpx
 from ..config import FOLDER_BY_TYPE
 
 _TIMEOUT = 30.0
-_MAX_BYTES = 200 * 1024 * 1024  # 200 MB cap to avoid runaway downloads
+_MAX_BYTES = 200 * 1024 * 1024  # 200 MB cap
 
 
 async def download(
@@ -24,36 +23,38 @@ async def download(
     target_dir.mkdir(parents=True, exist_ok=True)
 
     try:
-        async with client.stream("GET", url, timeout=_TIMEOUT) as resp:
-            if resp.status_code != 200:
-                return False, f"HTTP {resp.status_code}"
-            total = int(resp.headers.get("content-length", 0))
-            if total > _MAX_BYTES:
-                return False, f"too large ({total} bytes)"
+        resp = await client.get(url, timeout=_TIMEOUT)
+        if resp.status_code != 200:
+            return False, f"HTTP {resp.status_code}"
 
-            name = _filename_for(url, resp.headers.get("content-disposition", ""))
-            name = _ensure_ext(name, url, ftype)
-            name = _dedupe_name(target_dir, name)
-            dest = target_dir / name
+        content_type = resp.headers.get("content-type", "").lower()
 
-            written = 0
-            with dest.open("wb") as f:
-                async for chunk in resp.aiter_bytes(chunk_size=64 * 1024):
-                    f.write(chunk)
-                    written += len(chunk)
-                    if written > _MAX_BYTES:
-                        f.close()
-                        dest.unlink(missing_ok=True)
-                        return False, f"stream exceeded {_MAX_BYTES} bytes"
-            return True, str(dest)
+        # For images: verify it's actually an image by content-type
+        if ftype == "image" and not any(t in content_type for t in ("image/", "octet-stream")):
+            return False, f"not an image (content-type: {content_type})"
+
+        # For videos: verify content-type
+        if ftype == "video" and not any(t in content_type for t in ("video/", "octet-stream", "mp4")):
+            return False, f"not a video (content-type: {content_type})"
+
+        total = len(resp.content)
+        if total > _MAX_BYTES:
+            return False, f"too large ({total} bytes)"
+
+        name = _filename_for(url, resp.headers.get("content-disposition", ""))
+        name = _ensure_ext(name, url, ftype, content_type)
+        name = _dedupe_name(target_dir, name)
+        dest = target_dir / name
+
+        dest.write_bytes(resp.content)
+        return True, str(dest)
     except httpx.TimeoutException:
         return False, "timeout"
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         return False, f"{type(e).__name__}: {e}"
 
 
 def _filename_for(url: str, content_disposition: str) -> str:
-    """Pick a filename from Content-Disposition, falling back to URL path."""
     if "filename=" in content_disposition:
         part = content_disposition.split("filename=", 1)[1]
         part = part.split(";", 1)[0].strip().strip('"')
@@ -65,10 +66,16 @@ def _filename_for(url: str, content_disposition: str) -> str:
     return "index"
 
 
-def _ensure_ext(name: str, url: str, ftype: str) -> str:
-    """If the name lacks an extension, derive one from the URL."""
+def _ensure_ext(name: str, url: str, ftype: str, content_type: str) -> str:
     if "." in name:
         return name
+    # derive from content-type
+    ct_map = {"image/jpeg": "jpg", "image/png": "png", "image/gif": "gif",
+              "image/webp": "webp", "image/svg+xml": "svg", "image/bmp": "bmp",
+              "video/mp4": "mp4", "video/webm": "webm", "video/quicktime": "mov",
+              "application/pdf": "pdf"}
+    if content_type in ct_map:
+        return f"{name}.{ct_map[content_type]}"
     ext = _ext_from_url(url)
     if ext:
         return f"{name}.{ext}"
@@ -88,7 +95,6 @@ def _safe(name: str) -> str:
 
 
 def _dedupe_name(dir_: Path, name: str) -> str:
-    """If `name` exists, append -1, -2, ... before the extension."""
     if not (dir_ / name).exists():
         return name
     stem, _, ext = name.rpartition(".")

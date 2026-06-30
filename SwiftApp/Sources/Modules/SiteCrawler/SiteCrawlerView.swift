@@ -4,15 +4,15 @@ struct SiteCrawlerView: View {
     @Environment(AppState.self) private var state
 
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 16) {
             HeroBlockView()
             InputCardView()
-            if !state.log.isEmpty {
-                LogPanel()
-            }
+            Spacer(minLength: 0)
+            StatusBar()
         }
         .padding(.horizontal, 48)
-        .padding(.vertical, 20)
+        .padding(.top, 20)
+        .padding(.bottom, 8)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
@@ -41,6 +41,43 @@ struct HeroBlockView: View {
                 .foregroundStyle(Color.textSecondary)
                 .multilineTextAlignment(.center)
         }
-        .padding(.bottom, 12)
+        .padding(.bottom, 8)
+    }
+}
+
+/// Tiny bottom-of-window status strip. Shows live activity + counts.
+struct StatusBar: View {
+    @Environment(AppState.self) private var state
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Circle()
+                .fill(dotColor)
+                .frame(width: 6, height: 6)
+            Text(state.statusMessage)
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundStyle(Color.textTertiary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+            Spacer()
+            if state.downloadedCount > 0 || state.failedCount > 0 {
+                Text("已下载 \(state.downloadedCount)")
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(Color.accentSuccess)
+                if state.failedCount > 0 {
+                    Text("· 失败 \(state.failedCount)")
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(Color.accentDanger)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private var dotColor: Color {
+        switch state.progress.phase {
+        case .running: .accentSuccess
+        case .notRunning: Color.borderStrong
+        }
     }
 }

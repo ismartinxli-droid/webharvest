@@ -4,6 +4,7 @@ struct CrawlConfig: Codable {
     let url: String
     let types: Set<FileType>
     let savePath: URL
+    var maxDepth: Int = 3
 }
 
 struct CrawlSummary {

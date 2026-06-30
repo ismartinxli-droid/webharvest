@@ -1,7 +1,9 @@
 import Foundation
 
-enum FileType: String, CaseIterable, Codable, Hashable {
+enum FileType: String, CaseIterable, Codable, Hashable, Identifiable {
     case image, video, pdf
+
+    var id: String { rawValue }
 
     var label: String {
         switch self {

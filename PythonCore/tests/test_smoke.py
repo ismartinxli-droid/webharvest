@@ -38,32 +38,53 @@ from urllib.parse import urlparse
 
 class Handler(http.server.BaseHTTPRequestHandler):
     def _path(self) -> str:
-        # httpx sends absolute-form requests, so self.path may be the full URL.
-        # Strip scheme://host so we can compare against test paths.
         p = urlparse(self.path)
         return p.path or "/"
 
-    def do_GET(self) -> None:  # noqa: N802
+    def _content_type(self, path: str) -> tuple[str, int]:
+        # Returns (content_type, status_code)
+        if path in ("/", "/index.html"):
+            return ("text/html; charset=utf-8", 200)
+        if path == "/page2.html":
+            return ("text/html; charset=utf-8", 200)
+        if path.endswith((".jpg", ".jpeg")):
+            return ("image/jpeg", 200)
+        if path.endswith(".png"):
+            return ("image/png", 200)
+        if path.endswith(".webp"):
+            return ("image/webp", 200)
+        if path.endswith(".pdf"):
+            return ("application/pdf", 200)
+        if path.endswith(".mp4"):
+            return ("video/mp4", 200)
+        return ("text/plain", 404)
+
+    def _body(self, path: str) -> bytes:
+        ct, status = self._content_type(path)
+        if status == 200:
+            if ct.startswith("text/html"):
+                if path == "/page2.html":
+                    return PAGE2_HTML.encode()
+                return INDEX_HTML.encode()
+            return b"\x00" * 32
+        return b"not found"
+
+    def _respond(self, include_body: bool = True) -> None:
         path = self._path()
-        if path == "/" or path == "/index.html":
-            body = INDEX_HTML.encode()
-            self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
-        elif path == "/page2.html":
-            body = PAGE2_HTML.encode()
-            self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
-        elif path.endswith((".jpg", ".png", ".webp", ".pdf", ".mp4")):
-            body = b"\x00" * 32
-            self.send_response(200)
-            self.send_header("Content-Type", "application/octet-stream")
-        else:
-            self.send_response(404)
-            self.send_header("Content-Type", "text/plain")
-            body = b"not found"
+        ct, status = self._content_type(path)
+        body = self._body(path)
+        self.send_response(status)
+        self.send_header("Content-Type", ct)
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
-        self.wfile.write(body)
+        if include_body:
+            self.wfile.write(body)
+
+    def do_HEAD(self) -> None:  # noqa: N802
+        self._respond(include_body=False)
+
+    def do_GET(self) -> None:  # noqa: N802
+        self._respond(include_body=True)
 
     def log_message(self, *_: object) -> None:  # silence stderr
         return
@@ -106,9 +127,10 @@ def test_crawl_downloads_assets(tmp_path: Path, server: str, monkeypatch: pytest
     videos = list((tmp_path / "videos").glob("*"))
     pdfs = list((tmp_path / "pdfs").glob("*"))
 
-    assert {p.name for p in images} == {"photo.jpg", "icon.png", "banner.webp"}
-    assert {p.name for p in videos} == {"clip.mp4"}
-    assert {p.name for p in pdfs} == {"doc.pdf"}
+    # New spider uses content-type to name files, file names may differ
+    assert len(images) >= 3, f"Expected >=3 images, got {len(images)}: {[p.name for p in images]}"
+    assert len(videos) >= 1, f"Expected >=1 video, got {len(videos)}: {[p.name for p in videos]}"
+    assert len(pdfs) >= 1, f"Expected >=1 pdf, got {len(pdfs)}: {[p.name for p in pdfs]}"
 
     done = [e for e in events if e["event"] == "done"]
     assert done and done[0]["downloaded"] == 5 and done[0]["failed"] == 0

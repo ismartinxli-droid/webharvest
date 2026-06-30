@@ -8,12 +8,15 @@ final class AppState {
     var url: String = ""
     var fileTypes: Set<FileType> = [.image, .video]
     var savePath: URL = URL(fileURLWithPath: NSString("~/Downloads/WebHarvest").expandingTildeInPath)
+    var maxDepth: Int = 3
     var progress: Progress = .idle
     var log: [LogEntry] = []
     var currentFile: String?
     var downloadedCount: Int = 0
     var failedCount: Int = 0
-    var lastError: String?
+    var statusMessage: String = "就绪"
+
+    private var lastError: String?
 
     private let crawler = CrawlerProcess()
 
@@ -38,11 +41,11 @@ final class AppState {
         lastError = nil
         downloadedCount = 0
         failedCount = 0
-        log = []
         progress = .running
+        statusMessage = "启动中..."
 
         try? FileManager.default.createDirectory(at: savePath, withIntermediateDirectories: true)
-        let config = CrawlConfig(url: url, types: fileTypes, savePath: savePath)
+        let config = CrawlConfig(url: url, types: fileTypes, savePath: savePath, maxDepth: maxDepth)
         crawler.start(config: config)
     }
 
@@ -66,28 +69,28 @@ final class AppState {
     private func handle(event: CrawlerEvent) {
         switch event {
         case .ready:
-            log.append(.info("Python 子进程已就绪"))
+            statusMessage = "已就绪"
         case .phase(let phase):
             progress = .runningPhase(phase)
+            statusMessage = phase
         case .pagesCrawled(let n):
-            log.append(.info("已扫描 \(n) 个页面"))
+            statusMessage = "已扫描 \(n) 个页面"
         case .assetQueued(let type, let url):
-            log.append(.info("发现 \(type.label): \(url)"))
+            statusMessage = "发现 \(type.label): \(self.shortName(url))"
         case .assetDownloaded(let type, let path, let size):
             downloadedCount += 1
-            currentFile = path.lastPathComponent
-            log.append(.ok("已下载 \(type.label) → \(path.lastPathComponent) (\(Self.formatBytes(size)))"))
+            currentFile = self.shortName(path)
+            statusMessage = "✓ \(self.shortName(path)) · \(Self.formatBytes(size))"
         case .assetFailed(let type, let url, let reason):
             failedCount += 1
-            log.append(.err("\(type.label) 下载失败: \(url) — \(reason)"))
+            statusMessage = "✕ \(reason)"
         case .done(let summary):
             progress = .done(downloaded: summary.downloaded, failed: summary.failed)
             currentFile = nil
-            log.append(.ok("完成。共下载 \(summary.downloaded) 个,失败 \(summary.failed) 个"))
+            statusMessage = "完成 · 下载 \(summary.downloaded) · 失败 \(summary.failed)"
         case .error(let message):
             progress = .error(message)
-            lastError = message
-            log.append(.err(message))
+            statusMessage = "错误: \(message)"
         }
     }
 
@@ -97,6 +100,15 @@ final class AppState {
         var i = 0
         while v >= 1024 && i < units.count - 1 { v /= 1024; i += 1 }
         return String(format: "%.1f %@", v, units[i])
+    }
+
+    private func shortName(_ s: String) -> String {
+        if let last = s.split(separator: "/").last { return String(last) }
+        return s
+    }
+
+    private func shortName(_ u: URL) -> String {
+        u.lastPathComponent
     }
 }
 

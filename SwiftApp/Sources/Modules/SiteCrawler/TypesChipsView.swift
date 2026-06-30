@@ -8,61 +8,95 @@ struct TypesChipsView: View {
             Text("文件类型")
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(Color.textPrimary)
+
             HStack(spacing: 10) {
-                ForEach(FileType.allCases, id: \.self) { type in
-                    ChipToggle(type: type, isOn: state.fileTypes.contains(type)) {
-                        if state.fileTypes.contains(type) {
-                            state.fileTypes.remove(type)
-                        } else {
-                            state.fileTypes.insert(type)
-                        }
+                ForEach(FileType.allCases) { ft in
+                    TypeChip(ft: ft)
+                }
+            }
+
+            HStack(spacing: 10) {
+                Text("抓取深度")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Color.textPrimary)
+                Spacer()
+                HStack(spacing: 0) {
+                    ForEach(1...5, id: \.self) { depth in
+                        DepthButton(depth: depth)
                     }
                 }
-                Spacer()
+                Text("级")
+                    .font(.system(size: 13))
+                    .foregroundStyle(Color.textSecondary)
             }
         }
     }
 }
 
-struct ChipToggle: View {
-    let type: FileType
-    let isOn: Bool
-    let action: () -> Void
+struct TypeChip: View {
+    @Environment(AppState.self) private var state
+    let ft: FileType
+    var isSelected: Bool { state.fileTypes.contains(ft) }
 
     var body: some View {
-        Button(action: action) {
+        Button(action: {
+            if isSelected { state.fileTypes.remove(ft) }
+            else { state.fileTypes.insert(ft) }
+        }) {
             HStack(spacing: 8) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 5)
-                        .fill(isOn ? Color.brand : Color.backgroundCard)
-                        .frame(width: 18, height: 18)
+                        .fill(isSelected ? Color.brand : Color.backgroundInput)
                         .overlay(
                             RoundedRectangle(cornerRadius: 5)
-                                .stroke(isOn ? Color.brand : Color.borderStrong, lineWidth: isOn ? 0 : 1.5)
+                                .stroke(isSelected ? Color.brand : Color.borderDefault, lineWidth: 1)
                         )
-                    if isOn {
+                    if isSelected {
                         Image(systemName: "checkmark")
                             .font(.system(size: 11, weight: .bold))
                             .foregroundStyle(.white)
                     }
                 }
-                Image(systemName: type.icon)
-                    .font(.system(size: 13))
-                    .foregroundStyle(isOn ? Color.brand : Color.textSecondary)
-                Text(type.label)
-                    .font(.system(size: 14, weight: isOn ? .semibold : .medium))
-                    .foregroundStyle(isOn ? Color.brand : Color.textSecondary)
+                .frame(width: 18, height: 18)
+
+                Image(systemName: ft.icon)
+                    .font(.system(size: 16))
+                    .foregroundStyle(isSelected ? Color.brand : Color.textTertiary)
+
+                Text(ft.label)
+                    .font(.system(size: 14, weight: isSelected ? .semibold : .medium))
+                    .foregroundStyle(isSelected ? Color.brand : Color.textSecondary)
             }
             .padding(.horizontal, 14)
             .frame(height: 40)
             .background(
                 RoundedRectangle(cornerRadius: 10)
-                    .fill(isOn ? Color.tabActiveFill : .clear)
+                    .fill(isSelected ? Color.brand.opacity(0.06) : Color.backgroundInput)
                     .overlay(
                         RoundedRectangle(cornerRadius: 10)
-                            .stroke(isOn ? Color.brand.opacity(0.25) : Color.borderDefault, lineWidth: 1)
+                            .stroke(isSelected ? Color.brand.opacity(0.25) : Color.borderDefault, lineWidth: 1)
                     )
             )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+struct DepthButton: View {
+    @Environment(AppState.self) private var state
+    let depth: Int
+    var isSelected: Bool { state.maxDepth == depth }
+
+    var body: some View {
+        Button(action: { state.maxDepth = depth }) {
+            Text("\(depth)")
+                .font(.system(size: 13, weight: isSelected ? .bold : .medium))
+                .foregroundStyle(isSelected ? .white : Color.textSecondary)
+                .frame(width: 28, height: 28)
+                .background(
+                    Rectangle()
+                        .fill(isSelected ? Color.brand : Color.clear)
+                )
         }
         .buttonStyle(.plain)
     }

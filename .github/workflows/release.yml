@@ -70,7 +70,7 @@ jobs:
 
           mkdir -p /tmp/pbs
           echo "Downloading PBS from $PBS_URL"
-          curl -L --show-error --fail -o /tmp/pbs/python.tar.gz "$PBS_URL"
+          curl -L --http1.1 --show-error --fail -o /tmp/pbs/python.tar.gz "$PBS_URL"
           ls -la /tmp/pbs/python.tar.gz
 
           echo "Extracting..."
@@ -89,9 +89,11 @@ jobs:
               httpx selectolax tldextract
           cp -R PythonCore/webharvest dist/WebHarvest.app/Contents/Resources/python/site-packages/
 
-      - name: Strip quarantine (zero-friction self-use)
+      - name: Ad-hoc codesign (required by macOS even for self-use)
         run: |
-          xattr -cr dist/WebHarvest.app
+          codesign --force --deep --sign - dist/WebHarvest.app
+          codesign --verify --verbose=2 dist/WebHarvest.app
+          codesign -dv dist/WebHarvest.app
 
       - name: Package as .dmg
         run: |
