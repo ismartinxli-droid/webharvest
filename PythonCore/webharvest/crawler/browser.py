@@ -68,6 +68,14 @@ async def extract_asset_urls(target_url: str) -> tuple[set[str], dict[str, str],
         await page.goto(target_url, wait_until="domcontentloaded", timeout=60000)
         await page.wait_for_timeout(5000)  # let lazy-loaders fire (5s for SPAs)
 
+        # Extract @font-face URLs and download fonts via page context.
+        # Python Playwright does not fire response events with resource_type="font"
+        # for fonts loaded via CSS @font-face (unlike Node.js Playwright which does).
+        # We extract URLs from stylesheets directly and download with fetch().
+        font_bodies = await _extract_fonts_from_stylesheets(page)
+        for url, body in font_bodies.items():
+            saved_bodies[url] = body
+
         # Extract all img/src attributes from DOM
         dom_urls = await page.evaluate("""() => {
             const s = new Set();
@@ -122,6 +130,106 @@ async def extract_asset_urls(target_url: str) -> tuple[set[str], dict[str, str],
         await browser.close()
 
     return urls, cookies, saved_bodies
+
+
+async def _extract_fonts_from_stylesheets(page) -> dict[str, bytes]:
+    """Extract @font-face URLs from all accessible stylesheets and download font
+    files using fetch() inside the page context (bypasses WAF because it has the
+    full browser session with cookies, referer, and TLS fingerprint).
+
+    Returns {url: bytes} dict, same format as saved_bodies."""
+    font_bodies: dict[str, bytes] = {}
+
+    try:
+        # Step 1: Extract all font URLs from @font-face rules in stylesheets
+        result = await page.evaluate("""() => {
+            const fontUrls = [];
+            const seen = new Set();
+            const FONT_EXTS = ['.ttf', '.otf', '.woff', '.woff2', '.eot'];
+
+            for (const sheet of document.styleSheets) {
+                try {
+                    for (const rule of sheet.cssRules || []) {
+                        if (!rule.cssText.includes('@font-face')) continue;
+                        // Extract url(...) values from src descriptor
+                        const srcMatch = rule.cssText.match(/src\\s*:\\s*([^;}]+)/);
+                        if (!srcMatch) continue;
+                        const srcValue = srcMatch[1];
+                        const urlRe = /url\\(["']?([^"')]+)["']?\\)/g;
+                        let m;
+                        while ((m = urlRe.exec(srcValue)) !== null) {
+                            const url = m[1];
+                            // Skip data: URIs
+                            if (url.startsWith('data:')) continue;
+                            // Skip duplicates
+                            if (seen.has(url)) continue;
+                            seen.add(url);
+                            // Only include actual font files
+                            const lower = url.toLowerCase();
+                            if (FONT_EXTS.some(ext => lower.includes(ext))) {
+                                fontUrls.push(url);
+                            }
+                        }
+                    }
+                } catch (e) { /* CORS stylesheet, skip */ }
+            }
+
+            // Also scan <link rel="stylesheet"> for font-face in external CSS
+            // by checking computed styles (limited but helpful)
+            const allElements = document.querySelectorAll('*');
+            const fontFamilies = new Set();
+            allElements.forEach(el => {
+                const ff = getComputedStyle(el).fontFamily;
+                if (ff) ff.split(',').forEach(f => fontFamilies.add(f.trim().replace(/['"]/g, '')));
+            });
+
+            return JSON.stringify({ urls: fontUrls, families: Array.from(fontFamilies).slice(0, 20) });
+        }""")
+
+        import json
+        data = json.loads(result)
+        font_urls = data.get("urls", [])
+
+        if not font_urls:
+            return font_bodies
+
+        # Step 2: Download each font via fetch() in page context
+        download_result = await page.evaluate("""(urls) => {
+            async function downloadFonts(urls) {
+                const results = {};
+                for (const url of urls) {
+                    try {
+                        const resp = await fetch(url, { credentials: 'include' });
+                        if (!resp.ok) continue;
+                        const blob = await resp.blob();
+                        // Convert blob to base64 for transfer back to Python
+                        const reader = new FileReader();
+                        const base64 = await new Promise((resolve) => {
+                            reader.onload = () => resolve(reader.result);
+                            reader.readAsDataURL(blob);
+                        });
+                        results[url] = base64;
+                    } catch (e) {
+                        // skip failed fonts
+                    }
+                }
+                return JSON.stringify(results);
+            }
+            return downloadFonts(urls);
+        }""", font_urls)
+
+        raw_results = json.loads(download_result)
+        import base64
+        for url, data_url in raw_results.items():
+            if isinstance(data_url, str) and "," in data_url:
+                raw = base64.b64decode(data_url.split(",", 1)[1])
+                if raw and len(raw) > 100:
+                    font_bodies[url] = raw
+
+    except Exception:
+        pass
+
+    return font_bodies
 
 
 async def download_assets_via_playwright(
