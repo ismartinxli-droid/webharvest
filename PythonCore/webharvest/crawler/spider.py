@@ -28,7 +28,14 @@ _CT_FONT = ("font/", "application/x-font", "application/font")
 
 
 async def run(url: str, types: set[str], save_path: str, max_depth: int = 3) -> None:
-    """Crawl same-domain pages up to max_depth levels, download all matching assets."""
+    """Crawl pages up to max_depth levels, download all matching assets.
+
+    Depth semantics (user-visible):
+      depth=1 → seed page only (no sub-page crawling)
+      depth=2 → seed + sub-pages (links from seed page)
+      depth=3 → seed + sub-pages + sub-sub-pages
+      (capped at 3 for performance)
+    """
     parsed = urlparse(url)
     if not parsed.scheme or not parsed.netloc:
         emit("error", message=f"invalid url: {url}")
@@ -38,7 +45,14 @@ async def run(url: str, types: set[str], save_path: str, max_depth: int = 3) -> 
     save_root = Path(save_path).expanduser()
     save_root.mkdir(parents=True, exist_ok=True)
 
-    emit("phase", name=f"crawling (depth 0/{max_depth})")
+    # Convert user-visible depth to internal BFS depth:
+    #   user depth 1 → 0 BFS levels (seed only)
+    #   user depth 2 → 1 BFS level (seed + sub-pages)
+    #   user depth 3 → 2 BFS levels (seed + 2 levels of sub-pages)
+    user_depth = max_depth
+    bfs_depth = max(0, user_depth - 1)
+
+    emit("phase", name=f"crawling (seed + {bfs_depth} sub-level{'s' if bfs_depth != 1 else ''})")
     frontier = UrlFrontier(seed=url)
     seen_pages: set[str] = {url}
     seen_assets: set[str] = set()
@@ -282,7 +296,7 @@ async def run(url: str, types: set[str], save_path: str, max_depth: int = 3) -> 
                     await try_download(asset_url)
 
             # Discover new page links (sub-pages) — only if not at max depth
-            if depth < max_depth:
+            if depth < bfs_depth:
                 for a in html.css("a[href]"):
                     href = a.attributes.get("href") or ""
                     if not href or href.startswith(("#", "javascript:", "mailto:", "tel:")):
@@ -366,14 +380,13 @@ async def run(url: str, types: set[str], save_path: str, max_depth: int = 3) -> 
                 await try_download(asset_url)
 
         # BFS layer by layer.
-        # frontier currently has [seed, sub_1, ..., sub_N] where seed was pushed by UrlFrontier
-        # and sub_N were pushed by the Playwright sub-page discovery above.
-        # Drain ONLY the seed (first element) — sub-pages should be processed by BFS.
+        # Seed was pushed by UrlFrontier. Drain it — it's already processed by Playwright.
+        # Sub-pages from Playwright DOM are in the frontier and will be processed by BFS.
         frontier.pop_batch(1)
         current_depth = 0
-        while not frontier.empty() and len(seen_pages) < _MAX_PAGES and current_depth < max_depth:
+        while not frontier.empty() and len(seen_pages) < _MAX_PAGES and current_depth < bfs_depth:
             batch = frontier.pop_batch(8)
-            emit("phase", name=f"crawling (depth {current_depth + 1}/{max_depth}, {len(batch)} pages)")
+            emit("phase", name=f"crawling sub-level {current_depth + 1}/{bfs_depth} ({len(batch)} pages)")
             await asyncio.gather(*(process_page(u, current_depth) for u in batch))
             current_depth += 1
 

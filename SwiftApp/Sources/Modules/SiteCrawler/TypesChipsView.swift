@@ -21,7 +21,7 @@ struct TypesChipsView: View {
                     .foregroundStyle(Color.textPrimary)
                 Spacer()
                 HStack(spacing: 0) {
-                    ForEach(1...5, id: \.self) { depth in
+                    ForEach(1...3, id: \.self) { depth in
                         DepthButton(depth: depth)
                     }
                 }
@@ -29,6 +29,9 @@ struct TypesChipsView: View {
                     .font(.system(size: 13))
                     .foregroundStyle(Color.textSecondary)
             }
+            Text("1=当前页 · 2=包含子页面 · 3=包含子页面的子页面")
+                .font(.system(size: 11))
+                .foregroundStyle(Color.textSecondary)
         }
     }
 }
