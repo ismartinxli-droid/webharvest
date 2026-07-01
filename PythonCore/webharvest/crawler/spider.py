@@ -230,7 +230,7 @@ async def run(url: str, types: set[str], save_path: str, max_depth: int = 3) -> 
 
                 # Level 1: process seed's sub-pages
                 current_depth = 0
-                current_batch = level_pages
+                current_batch = level_pages[:20]  # cap per level to prevent runaway
                 while current_depth < bfs_depth and current_batch:
                     emit("phase", name=f"crawling sub-level {current_depth + 1}/{bfs_depth} ({len(current_batch)} pages)")
                     next_level_pages: list[str] = []
@@ -239,8 +239,12 @@ async def run(url: str, types: set[str], save_path: str, max_depth: int = 3) -> 
                         if len(seen_assets) >= _MAX_ASSETS:
                             break
                         emit("phase", name=f"sub-page [{i+1}/{len(current_batch)}]: {sub_url[:100]}")
+                        # Each sub-page gets a 120s budget (Playwright load + asset extraction)
                         try:
-                            sub_urls, sub_bodies, sub_subs = await extract_sub_page_assets(p_context, sub_url)
+                            sub_urls, sub_bodies, sub_subs = await asyncio.wait_for(
+                                extract_sub_page_assets(p_context, sub_url),
+                                timeout=120,
+                            )
 
                             # Save bodies from this sub-page
                             sub_saved = await _save_playwright_bodies(sub_bodies)
@@ -253,7 +257,7 @@ async def run(url: str, types: set[str], save_path: str, max_depth: int = 3) -> 
                                     await try_download(u)
 
                             # Collect next-level sub-pages (if we need depth 3)
-                            if current_depth + 1 < bfs_depth:
+                            if current_depth + 1 < bfs_depth and len(next_level_pages) < 20:
                                 for su in sub_subs:
                                     if su not in seen_pages and _registered_host(urlparse(su).netloc) == base_host:
                                         seen_pages.add(su)

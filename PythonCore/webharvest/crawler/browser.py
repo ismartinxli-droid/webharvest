@@ -211,14 +211,32 @@ async def _process_page(context, page, target_url: str) -> tuple[set[str], dict[
 # ---------------------------------------------------------------------------
 
 async def _download_assets_via_fetch(page, urls: list[str]) -> dict[str, bytes]:
+    """Download assets via fetch() with a per-URL timeout of 15s.
+    Total evaluate call is capped at 30s to prevent hanging on large files."""
     result: dict[str, bytes] = {}
     if not urls:
         return result
     try:
         raw = await page.evaluate("""(urls) => {
-            async function dl(urls){const r={};for(const u of urls){try{const p=await fetch(u,{credentials:"include"});if(!p.ok)continue;const b=await p.blob();const reader=new FileReader();const d=await new Promise((res)=>{reader.onload=()=>res(reader.result);reader.readAsDataURL(b)});r[u]=d}catch(e){}}return JSON.stringify(r)}
+            async function dl(urls){
+                const r={};
+                for(const u of urls){
+                    try{
+                        const controller = new AbortController();
+                        const tid = setTimeout(() => controller.abort(), 15000);
+                        const p = await fetch(u, {credentials:"include", signal: controller.signal});
+                        clearTimeout(tid);
+                        if(!p.ok)continue;
+                        const b = await p.blob();
+                        const reader=new FileReader();
+                        const d=await new Promise((res)=>{reader.onload=()=>res(reader.result);reader.readAsDataURL(b)});
+                        r[u]=d;
+                    }catch(e){}
+                }
+                return JSON.stringify(r);
+            }
             return dl(urls);
-        }""", urls)
+        }""", urls, timeout=30000)
         raw_results = json.loads(raw)
         for url, data_url in raw_results.items():
             if isinstance(data_url, str) and "," in data_url:
@@ -242,9 +260,9 @@ async def _extract_fonts_from_stylesheets(page) -> dict[str, bytes]:
         font_urls = data.get("urls", [])
         if font_urls:
             download_result = await page.evaluate("""(urls) => {
-                async function dl(urls){const r={};for(const u of urls){try{const p=await fetch(u,{credentials:'include'});if(!p.ok)continue;const b=await p.blob();const reader=new FileReader();const d=await new Promise((res)=>{reader.onload=()=>res(reader.result);reader.readAsDataURL(b)});r[u]=d}catch(e){}}return JSON.stringify(r)}
+                async function dl(urls){const r={};for(const u of urls){try{const controller=new AbortController();const tid=setTimeout(()=>controller.abort(),15000);const p=await fetch(u,{credentials:'include',signal:controller.signal});clearTimeout(tid);if(!p.ok)continue;const b=await p.blob();const reader=new FileReader();const d=await new Promise((res)=>{reader.onload=()=>res(reader.result);reader.readAsDataURL(b)});r[u]=d}catch(e){}}return JSON.stringify(r)}
                 return dl(urls);
-            }""", font_urls)
+            }""", font_urls, timeout=30000)
             raw_results = json.loads(download_result)
             for url, data_url in raw_results.items():
                 if isinstance(data_url, str) and "," in data_url:
