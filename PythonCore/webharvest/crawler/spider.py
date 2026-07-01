@@ -4,16 +4,14 @@ httpx fallback is only used for downloading individual asset URLs."""
 from __future__ import annotations
 
 import asyncio
-import re
 from pathlib import Path
-from urllib.parse import urljoin, urlparse, unquote
+from urllib.parse import urlparse, unquote
 
 import httpx
 import tldextract
 
 from ..config import FOLDER_BY_TYPE
 from ..protocol import emit
-from .url_frontier import UrlFrontier
 
 _MAX_CONCURRENT = 6
 _REQUEST_TIMEOUT = 15.0
@@ -199,81 +197,57 @@ async def run(url: str, types: set[str], save_path: str, max_depth: int = 3) -> 
                 await try_download(asset_url)
 
     # ======================================================================
-    # Phase 2: Sub-pages via Playwright (same browser context)
+    # Phase 2: Sub-pages — same function as seed, one new browser per page
     # ======================================================================
     if bfs_depth > 0 and current_sub_pages:
         emit("phase", name=f"Playwright found {len(current_sub_pages)} sub-page links")
 
-        # Filter out already-seen and determine which to crawl each level
         level_pages = [u for u in current_sub_pages if u not in seen_pages]
         for sp in level_pages:
             seen_pages.add(sp)
 
-        emit("phase", name=f"Processing {len(level_pages)} sub-pages via Playwright...")
+        emit("phase", name=f"Processing {len(level_pages)} sub-pages (same pipeline as seed)...")
 
         try:
-            from playwright.async_api import async_playwright
-            from .browser import extract_sub_page_assets
+            from .browser import extract_asset_urls as browser_extract
 
-            async with async_playwright() as pw:
-                browser = await pw.chromium.launch(
-                    channel="chrome", headless=True,
-                    args=["--no-sandbox","--disable-blink-features=AutomationControlled",
-                          "--disable-web-security","--allow-running-insecure-content",
-                          "--window-size=1920,1080"],
-                )
-                p_context = await browser.new_context(
-                    user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
-                    viewport={"width": 1920, "height": 1080},
-                    locale="zh-CN", timezone_id="Asia/Shanghai",
-                )
+            current_batch = level_pages
+            current_depth = 0
+            while current_depth < bfs_depth and current_batch:
+                emit("phase", name=f"crawling sub-level {current_depth + 1}/{bfs_depth} ({len(current_batch)} pages)")
+                next_level_pages: list[str] = []
 
-                # Level 1: process seed's sub-pages
-                current_depth = 0
-                current_batch = level_pages
-                while current_depth < bfs_depth and current_batch:
-                    emit("phase", name=f"crawling sub-level {current_depth + 1}/{bfs_depth} ({len(current_batch)} pages)")
-                    next_level_pages: list[str] = []
+                for i, sub_url in enumerate(current_batch):
+                    if len(seen_assets) >= _MAX_ASSETS:
+                        break
+                    emit("phase", name=f"sub-page [{i+1}/{len(current_batch)}]: {sub_url[:100]}")
+                    try:
+                        sub_urls, _sub_cookies, sub_bodies, sub_subs = await asyncio.wait_for(
+                            browser_extract(sub_url),
+                            timeout=180,
+                        )
 
-                    for i, sub_url in enumerate(current_batch):
-                        if len(seen_assets) >= _MAX_ASSETS:
-                            break
-                        emit("phase", name=f"sub-page [{i+1}/{len(current_batch)}]: {sub_url[:100]}")
-                        # Each sub-page gets a 120s budget (Playwright load + asset extraction)
-                        try:
-                            sub_urls, sub_bodies, sub_subs = await asyncio.wait_for(
-                                extract_sub_page_assets(p_context, sub_url),
-                                timeout=120,
-                            )
+                        sub_saved = await _save_playwright_bodies(sub_bodies)
+                        if sub_saved > 0:
+                            emit("phase", name=f"  → saved {sub_saved} assets from {sub_url[:70]}")
 
-                            # Save bodies from this sub-page
-                            sub_saved = await _save_playwright_bodies(sub_bodies)
-                            if sub_saved > 0:
-                                emit("phase", name=f"  → saved {sub_saved} assets from {sub_url[:70]}")
+                        if current_depth + 1 < bfs_depth:
+                            for su in sub_subs:
+                                if su not in seen_pages and _registered_host(urlparse(su).netloc) == base_host:
+                                    seen_pages.add(su)
+                                    next_level_pages.append(su)
+                    except asyncio.TimeoutError:
+                        emit("phase", name=f"  → timed out (180s), skipping")
+                    except Exception as e:
+                        emit("phase", name=f"  → failed: {e}")
 
-                            # Download non-body assets via httpx
-                            for u in sub_urls:
-                                if u not in seen_assets:
-                                    await try_download(u)
-
-                            # Collect next-level sub-pages (if we need depth 3)
-                            if current_depth + 1 < bfs_depth:
-                                for su in sub_subs:
-                                    if su not in seen_pages and _registered_host(urlparse(su).netloc) == base_host:
-                                        seen_pages.add(su)
-                                        next_level_pages.append(su)
-                        except Exception as e:
-                            emit("phase", name=f"  → failed: {e}")
-
-                    current_depth += 1
-                    current_batch = next_level_pages
-
-                await browser.close()
+                current_depth += 1
+                current_batch = next_level_pages
 
         except ImportError:
             emit("phase", name="Playwright not available for sub-pages")
         except Exception as e:
-            emit("phase", name=f"Sub-page Playwright failed ({e})")
+            emit("phase", name=f"Sub-page crawl error: {e}")
 
     # ======================================================================
     # Phase 3: CDN retry via Playwright (full browser context)

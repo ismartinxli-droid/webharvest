@@ -59,19 +59,6 @@ async def extract_asset_urls(target_url: str) -> tuple[set[str], dict[str, str],
     return result
 
 
-async def extract_sub_page_assets(context, target_url: str) -> tuple[set[str], dict[str, bytes], set[str]]:
-    """Extract assets from a sub-page using an EXISTING browser context.
-    Returns (new_asset_urls, new_saved_bodies, sub_page_urls).
-    The caller merges these into its own aggregates and tracks seen_pages globally."""
-    page = await context.new_page()
-    await page.add_init_script(_INIT_SCRIPT)
-
-    all_urls, _cookies, saved_bodies, sub_pages = await _process_page(context, page, target_url)
-
-    await page.close()
-    return all_urls, saved_bodies, sub_pages
-
-
 # ---------------------------------------------------------------------------
 # Internal: shared page processing logic
 # ---------------------------------------------------------------------------
