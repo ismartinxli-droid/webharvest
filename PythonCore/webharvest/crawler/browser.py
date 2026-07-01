@@ -83,6 +83,31 @@ async def _process_page(context, page, target_url: str) -> tuple[set[str], dict[
     saved_bodies: dict[str, bytes] = {}
 
     # --- Response capture ---
+    # Use page.route() to intercept video responses and capture full bodies.
+    # Unlike page.on("response"), route.fetch() returns the full body in one
+    # shot (no CDP "No data found" race for HTTP 206 partial content).
+    # Match by URL extension to avoid intercepting every single request.
+    async def _route_video(route):
+        url = route.request.url.lower()
+        # Only intercept URLs that look like video files
+        if any(url.endswith(ext) or f"{ext}?" in url for ext in (".mp4", ".mov", ".webm", ".mkv", ".avi", ".m4v", ".flv")):
+            try:
+                resp = await route.fetch()
+                body = await resp.body()
+                if body and len(body) > 100:
+                    saved_bodies[url] = body
+                await route.fulfill(response=resp)
+                urls.add(url)
+            except Exception:
+                await route.continue_()
+        else:
+            await route.continue_()
+
+    await page.route("**/*", _route_video)
+
+    # For non-video assets and media fallback, still use the response handler.
+    # The route handler captures most video bodies; _on_resp catches the rest
+    # as best-effort (some may fail with "No data found" for 206 responses).
     async def _on_resp(resp):
         rt = resp.request.resource_type
         if rt in ("image", "media", "font") and resp.ok:
