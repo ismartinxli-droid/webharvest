@@ -4,7 +4,6 @@ import Observation
 
 @Observable
 final class AppState {
-    var selectedModule: Module = .siteCrawler
     var url: String = ""
     var fileTypes: Set<FileType> = [.image, .video]
     var savePath: URL = URL(fileURLWithPath: NSString("~/Downloads/WebHarvest").expandingTildeInPath)
