@@ -1,5 +1,6 @@
 """BFS site crawler: discovers pages, extracts ALL URLs, downloads by content-type.
-Uses Playwright for JS rendering when available, falls back to static HTML parsing."""
+Uses Playwright for ALL page loads (seed + sub-pages) to bypass WAF detection.
+httpx fallback is only used for downloading individual asset URLs."""
 from __future__ import annotations
 
 import asyncio
@@ -9,7 +10,6 @@ from urllib.parse import urljoin, urlparse, unquote
 
 import httpx
 import tldextract
-from selectolax.parser import HTMLParser
 
 from ..config import FOLDER_BY_TYPE
 from ..protocol import emit
@@ -26,6 +26,9 @@ _CT_VIDEO = ("video/",)
 _CT_PDF = ("application/pdf",)
 _CT_FONT = ("font/", "application/x-font", "application/font")
 
+# Save-body helpers — reused for seed AND sub-pages
+from ..config import IMAGE_EXTS, VIDEO_EXTS, FONT_EXTS, PDF_EXTS  # noqa: E402
+
 
 async def run(url: str, types: set[str], save_path: str, max_depth: int = 3) -> None:
     """Crawl pages up to max_depth levels, download all matching assets.
@@ -34,7 +37,6 @@ async def run(url: str, types: set[str], save_path: str, max_depth: int = 3) -> 
       depth=1 → seed page only (no sub-page crawling)
       depth=2 → seed + sub-pages (links from seed page)
       depth=3 → seed + sub-pages + sub-sub-pages
-      (capped at 3 for performance)
     """
     parsed = urlparse(url)
     if not parsed.scheme or not parsed.netloc:
@@ -49,85 +51,123 @@ async def run(url: str, types: set[str], save_path: str, max_depth: int = 3) -> 
     #   user depth 1 → 0 BFS levels (seed only)
     #   user depth 2 → 1 BFS level (seed + sub-pages)
     #   user depth 3 → 2 BFS levels (seed + 2 levels of sub-pages)
-    user_depth = max_depth
-    bfs_depth = max(0, user_depth - 1)
+    bfs_depth = max(0, max_depth - 1)
 
     emit("phase", name=f"crawling (seed + {bfs_depth} sub-level{'s' if bfs_depth != 1 else ''})")
-    frontier = UrlFrontier(seed=url)
+
     seen_pages: set[str] = {url}
     seen_assets: set[str] = set()
     downloaded = 0
     failed = 0
-    cdn_failed_urls: list[str] = []  # URLs that failed with HTTP 567 (CDN anti-hotlink)
+    cdn_failed_urls: list[str] = []
     sem = asyncio.Semaphore(_MAX_CONCURRENT)
 
-    # Try to use Playwright for JS rendering; fall back to static HTML
-    # NOTE: browser_urls must NOT be added to seen_assets here — try_download()
-    # checks seen_assets to decide whether to download. If we pre-populate it,
-    # Playwright-discovered assets will be silently skipped.
+    # --- Helper: save bodies captured by Playwright ---
+    async def _save_playwright_bodies(bodies: dict[str, bytes]) -> int:
+        """Write dict[url, bytes] to disk by URL extension. Returns count saved."""
+        nonlocal downloaded
+        saved = 0
+        for asset_url, body in bodies.items():
+            if asset_url in seen_assets:
+                continue
+            seen_assets.add(asset_url)
+            url_lower = asset_url.lower()
+            ftype = None
+            for ext in IMAGE_EXTS:
+                if f".{ext}" in url_lower or f".{ext}?" in url_lower:
+                    ftype = "image" ; break
+            if ftype is None:
+                for ext in VIDEO_EXTS:
+                    if f".{ext}" in url_lower or f".{ext}?" in url_lower:
+                        ftype = "video" ; break
+            if ftype is None:
+                for ext in FONT_EXTS:
+                    if f".{ext}" in url_lower or f".{ext}?" in url_lower:
+                        ftype = "font" ; break
+            if ftype is None:
+                for ext in PDF_EXTS:
+                    if f".{ext}" in url_lower or f".{ext}?" in url_lower:
+                        ftype = "pdf" ; break
+            if ftype is None or ftype not in types:
+                continue
+            path_part = urlparse(asset_url).path
+            name = path_part.rsplit("/", 1)[-1] if "/" in path_part else "asset"
+            name = unquote(name)
+            name = _safe(name)
+            dest_dir = Path(save_path) / FOLDER_BY_TYPE[ftype]
+            dest_dir.mkdir(parents=True, exist_ok=True)
+            (dest_dir / name).write_bytes(body)
+            saved += 1
+            emit("asset.downloaded", type=ftype, path=str(dest_dir / name), size=len(body))
+        downloaded += saved
+        return saved
+
+    # ======================================================================
+    # Phase 1: Seed page via Playwright
+    # ======================================================================
     browser_urls: set[str] = set()
     browser_cookies: dict[str, str] = {}
-    saved_bodies: dict[str, bytes] = {}  # bodies captured during Playwright page load
-    pw_sub_pages: set[str] = set()  # sub-page links from Playwright-rendered DOM
+    saved_bodies: dict[str, bytes] = {}
+    current_sub_pages: set[str] = set()
+
     try:
         from .browser import extract_asset_urls as browser_extract
 
         emit("phase", name="launching Chromium...")
-        browser_urls, browser_cookies, saved_bodies, pw_sub_pages = await browser_extract(url)
+        browser_urls, browser_cookies, saved_bodies, current_sub_pages = await browser_extract(url)
         emit("phase", name=f"Chromium found {len(browser_urls)} resources")
     except ImportError:
         emit("phase", name="Playwright not available, using static parser")
     except Exception as e:
         emit("phase", name=f"Playwright failed ({e}), using static parser")
 
+    # --- Save seed bodies ---
+    saved_seed = await _save_playwright_bodies(saved_bodies)
+    emit("phase", name=f"Saved {saved_seed} assets from seed page")
+
+    # --- Download remaining seed URLs via httpx ---
     # Build httpx client with cookies from Playwright session
-    # Use the seed URL as Referer for CDN anti-hotlink bypass
     client_headers = {
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
         "Referer": url.rstrip("/") + "/",
     }
     cookie_domain = parsed.netloc.split(":")[0]
+    client_cookies_h = None
     if browser_cookies:
-        client_cookies = httpx.Cookies()
+        client_cookies_h = httpx.Cookies()
         for name, value in browser_cookies.items():
-            client_cookies.set(name, value, domain=cookie_domain)
+            client_cookies_h.set(name, value, domain=cookie_domain)
 
     async with httpx.AsyncClient(
         timeout=_REQUEST_TIMEOUT,
         follow_redirects=True,
         headers=client_headers,
-        cookies=client_cookies if browser_cookies else None,
+        cookies=client_cookies_h,
     ) as client:
 
         async def try_download(asset_url: str) -> None:
-            """Try to download a URL. If it matches a wanted content-type, save it."""
             nonlocal downloaded, failed
             if asset_url in seen_assets or len(seen_assets) > _MAX_ASSETS:
                 return
             seen_assets.add(asset_url)
-
             if asset_url.startswith("data:"):
                 return
-
             try:
                 async with sem:
                     resp = await client.get(asset_url, timeout=_DOWNLOAD_TIMEOUT)
                 if resp.status_code != 200:
                     failed += 1
-                    # Collect CDN anti-hotlink failures for Playwright retry
                     if resp.status_code == 567:
                         cdn_failed_urls.append(asset_url)
                     emit("asset.failed", type="image", url=asset_url, error=f"HTTP {resp.status_code}")
                     return
-
                 ct = (resp.headers.get("content-type") or "").lower()
                 body = resp.content
                 if not body:
                     failed += 1
                     emit("asset.failed", type="image", url=asset_url, error="empty response")
                     return
-
-                ftype: str | None = None
+                ftype = None
                 if any(ct.startswith(p) for p in _CT_IMAGE):
                     ftype = "image"
                 elif any(ct.startswith(p) for p in _CT_VIDEO):
@@ -136,261 +176,104 @@ async def run(url: str, types: set[str], save_path: str, max_depth: int = 3) -> 
                     ftype = "pdf"
                 elif any(ct.startswith(p) for p in _CT_FONT):
                     ftype = "font"
-
                 if ftype is None or ftype not in types:
                     failed += 1
                     emit("asset.failed", type="image", url=asset_url, error=f"unexpected type: {ct}")
                     return
-
                 name = _filename_for(resp)
                 dest_dir = save_root / FOLDER_BY_TYPE[ftype]
                 dest_dir.mkdir(parents=True, exist_ok=True)
                 dest = dest_dir / name
                 dest.write_bytes(body)
-
                 downloaded += 1
                 emit("asset.downloaded", type=ftype, path=str(dest), size=len(body))
             except Exception as e:
                 failed += 1
                 emit("asset.failed", type="image", url=asset_url, error=str(e))
-                return
 
-        async def process_page(page_url: str, depth: int) -> None:
-            nonlocal downloaded, failed
-            try:
-                async with sem:
-                    resp = await client.get(page_url)
-                if resp.status_code != 200:
-                    return
-                ct = (resp.headers.get("content-type") or "").lower()
-                if not ct.startswith("text/html") and "html" not in ct:
-                    return
-            except Exception:
-                return
-
-            # Detect WAF block pages (EdgeOne / CloudFlare) and skip quickly
-            page_text = resp.text
-            if len(page_text) < 500 or "EdgeOne" in page_text or "安全策略拦截" in page_text or "cf-browser-verification" in page_text:
-                return
-
-            html = HTMLParser(page_text)
-
-            # Extract ALL URLs from the page for asset checking
-            all_urls: set[str] = set()
-
-            # 1. All src/srcset/data-src attributes (images, videos, sources)
-            for attr in ("src", "data-src", "data-original", "data-lazy-src",
-                         "data-srcset", "data-flickity-lazyload"):
-                for el in html.css(f"[{attr}]"):
-                    val = el.attributes.get(attr) or ""
-                    if attr == "data-srcset" or attr == "srcset":
-                        for part in val.split(","):
-                            url_part = part.strip().split(" ")[0]
-                            if url_part:
-                                all_urls.add(urljoin(page_url, url_part))
-                    else:
-                        if val and not val.startswith("data:"):
-                            all_urls.add(urljoin(page_url, val))
-
-            # 2. All href attributes (potential PDF links, or redirects to images)
-            for a in html.css("a[href]"):
-                href = a.attributes.get("href") or ""
-                if href and not href.startswith(("#", "javascript:", "mailto:", "tel:")):
-                    # Only add if it looks like a file (has extension or common patterns)
-                    path_lower = href.lower()
-                    if any(ext in path_lower for ext in (".jpg", ".jpeg", ".png", ".gif",
-                                                          ".webp", ".bmp", ".svg", ".mp4",
-                                                          ".mov", ".pdf", ".webm", ".ico",
-                                                          ".avif", ".tiff", ".heic")):
-                        all_urls.add(urljoin(page_url, href.split("#")[0]))
-
-            # 3. Meta tags (og:image etc)
-            for meta in html.css("meta[property], meta[name]"):
-                prop = (meta.attributes.get("property") or "").lower()
-                name = (meta.attributes.get("name") or "").lower()
-                if "image" in prop or "image" in name:
-                    content = meta.attributes.get("content") or ""
-                    if content and content.startswith("http"):
-                        all_urls.add(content)
-
-            # 4. Link tags (favicon, preload images etc)
-            for link in html.css("link[href]"):
-                href = link.attributes.get("href") or ""
-                rel = (link.attributes.get("rel") or "").lower()
-                if href and ("icon" in rel or "image" in rel or "preload" in rel):
-                    if not href.startswith("data:"):
-                        all_urls.add(urljoin(page_url, href))
-
-            # 5. CSS background-image in style attribute (hero/banner images)
-            _CSS_URL_RE = re.compile(r"url\(['\"]?(.*?)['\"]?\)")
-            for el in html.css("[style]"):
-                style_val = el.attributes.get("style") or ""
-                if "background" in style_val.lower():
-                    for match in _CSS_URL_RE.finditer(style_val):
-                        css_url = match.group(1)
-                        if css_url and not css_url.startswith("data:"):
-                            all_urls.add(urljoin(page_url, css_url))
-
-            # 6. More data-* attributes for lazy-loaded backgrounds
-            for attr in ("data-bg", "data-background", "data-background-image",
-                         "data-lazy", "data-echo", "data-lazyload", "data-src-url"):
-                for el in html.css(f"[{attr}]"):
-                    val = el.attributes.get(attr) or ""
-                    if val and not val.startswith("data:") and "{" not in val:
-                        all_urls.add(urljoin(page_url, val))
-
-            # 7. Picture > source srcset
-            for source in html.css("picture source[srcset]"):
-                srcset = source.attributes.get("srcset") or ""
-                for part in srcset.split(","):
-                    url_part = part.strip().split(" ")[0]
-                    if url_part:
-                        all_urls.add(urljoin(page_url, url_part))
-            for source in html.css("picture source[src]"):
-                src = source.attributes.get("src") or ""
-                if src and not src.startswith("data:"):
-                    all_urls.add(urljoin(page_url, src))
-
-            # 8. Parse <style> tag content for CSS background-image rules
-            for style_tag in html.css("style"):
-                css_text = style_tag.text() or ""
-                if "background" in css_text:
-                    for match in _CSS_URL_RE.finditer(css_text):
-                        css_url = match.group(1)
-                        if css_url and not css_url.startswith("data:"):
-                            full_url = urljoin(page_url, css_url)
-                            # Only add same-host background images
-                            if _same_host(full_url, base_host):
-                                all_urls.add(full_url)
-            # Also parse inline CSS in <div style="..."> etc — already done in #5
-
-            # 9. External CSS files (link rel="stylesheet")
-            #    Download CSS and extract background-image URLs.
-            for link in html.css("link[rel='stylesheet']"):
-                css_url = link.attributes.get("href") or ""
-                if css_url and not css_url.startswith("data:"):
-                    full_css_url = urljoin(page_url, css_url)
-                    if _same_host(full_css_url, base_host):
-                        try:
-                            async with sem:
-                                css_resp = await client.get(full_css_url, timeout=10)
-                            if css_resp.status_code == 200:
-                                css_text = css_resp.text
-                                for match in _CSS_URL_RE.finditer(css_text):
-                                    img_url = match.group(1)
-                                    if img_url and not img_url.startswith("data:"):
-                                        all_urls.add(urljoin(full_css_url, img_url))
-                        except Exception:
-                            pass
-
-            # Download asset URLs discovered on this page.
-            # Asset URLs (with known file extensions) are downloaded regardless of host —
-            # many sites host PDFs/images on CDN domains (e.g. cdn-public.nio.com).
-            # Only page-discovered links need same-host filtering.
-            _ASSET_EXT_RE = re.compile(
-                r"\.(jpg|jpeg|png|gif|webp|bmp|svg|mp4|mov|webm|pdf|ico|avif|tiff|heic|ttf|otf|woff|woff2)(\?.*)?$",
-                re.IGNORECASE,
-            )
-            for asset_url in all_urls:
-                if _ASSET_EXT_RE.search(asset_url):
-                    await try_download(asset_url)
-
-            # Discover new page links (sub-pages) — only if not at max depth
-            if depth < bfs_depth:
-                for a in html.css("a[href]"):
-                    href = a.attributes.get("href") or ""
-                    if not href or href.startswith(("#", "javascript:", "mailto:", "tel:")):
-                        continue
-                    abs_url = urljoin(page_url, href.split("#")[0])
-                    if _same_host(abs_url, base_host) and abs_url not in seen_pages:
-                        seen_pages.add(abs_url)
-                        frontier.push(abs_url)
-
-            emit("pages.crawled", count=len(seen_pages))
-
-        # First, save all assets captured during Playwright page load.
-        # These bodies were downloaded by Chrome with full page context (cookies, referer, JS)
-        # and cannot be fetched by httpx (WAF blocks with HTTP 567).
-        pw_saved = 0
-        if saved_bodies:
-            emit("phase", name=f"Saving {len(saved_bodies)} Playwright-captured asset bodies...")
-            for asset_url, body in saved_bodies.items():
-                if asset_url in seen_assets:
-                    continue
-                seen_assets.add(asset_url)
-                # Determine content-type and type from response headers
-                # We don't have headers, so use URL extension as fallback
-                from ..config import FOLDER_BY_TYPE, IMAGE_EXTS, VIDEO_EXTS, FONT_EXTS, PDF_EXTS
-                url_lower = asset_url.lower()
-                ftype = None
-                for ext in IMAGE_EXTS:
-                    if f".{ext}" in url_lower or f".{ext}?" in url_lower:
-                        ftype = "image"
-                        break
-                if ftype is None:
-                    for ext in VIDEO_EXTS:
-                        if f".{ext}" in url_lower or f".{ext}?" in url_lower:
-                            ftype = "video"
-                            break
-                if ftype is None:
-                    for ext in FONT_EXTS:
-                        if f".{ext}" in url_lower or f".{ext}?" in url_lower:
-                            ftype = "font"
-                            break
-                if ftype is None:
-                    for ext in PDF_EXTS:
-                        if f".{ext}" in url_lower or f".{ext}?" in url_lower:
-                            ftype = "pdf"
-                            break
-                if ftype is None or ftype not in types:
-                    continue
-                # Derive filename from URL
-                path_part = urlparse(asset_url).path
-                name = path_part.rsplit("/", 1)[-1] if "/" in path_part else "asset"
-                name = unquote(name)
-                name = _safe(name)
-                dest_dir = Path(save_path) / FOLDER_BY_TYPE[ftype]
-                dest_dir.mkdir(parents=True, exist_ok=True)
-                (dest_dir / name).write_bytes(body)
-                pw_saved += 1
-                downloaded += 1
-                emit("asset.downloaded", type=ftype, path=str(dest_dir / name), size=len(body))
-            emit("phase", name=f"Playwright captured {pw_saved} assets directly")
-
-        # Push sub-page links discovered by Playwright into the frontier.
-        # These are real same-host page URLs extracted from the rendered DOM.
-        # httpx-based process_page would fail on WAF-protected sites, so we
-        # must use Playwright-discovered links for depth crawling.
-        depth1_pages = []
-        for sub_url in pw_sub_pages:
-            if sub_url not in seen_pages:
-                seen_pages.add(sub_url)
-                frontier.push(sub_url)
-                depth1_pages.append(sub_url)
-        if depth1_pages:
-            emit("phase", name=f"Playwright found {len(depth1_pages)} sub-page links")
-
-        # Next, download Playwright-discovered assets via httpx (non-WAF ones).
-        # Playwright-captured bodies are already saved and added to seen_assets,
-        # so try_download will skip them.
+        # Download remaining URLs from seed's Playwright discovery
         remaining_urls = [u for u in browser_urls if u not in seen_assets]
         if remaining_urls:
             emit("phase", name=f"Downloading {len(remaining_urls)} remaining assets via HTTP...")
             for asset_url in remaining_urls:
                 await try_download(asset_url)
 
-        # BFS layer by layer.
-        # Seed was pushed by UrlFrontier. Drain it — it's already processed by Playwright.
-        # Sub-pages from Playwright DOM are in the frontier and will be processed by BFS.
-        frontier.pop_batch(1)
-        current_depth = 0
-        while not frontier.empty() and len(seen_pages) < _MAX_PAGES and current_depth < bfs_depth:
-            batch = frontier.pop_batch(8)
-            emit("phase", name=f"crawling sub-level {current_depth + 1}/{bfs_depth} ({len(batch)} pages)")
-            await asyncio.gather(*(process_page(u, current_depth) for u in batch))
-            current_depth += 1
+    # ======================================================================
+    # Phase 2: Sub-pages via Playwright (same browser context)
+    # ======================================================================
+    if bfs_depth > 0 and current_sub_pages:
+        emit("phase", name=f"Playwright found {len(current_sub_pages)} sub-page links")
 
-    # Retry CDN-failed assets via Playwright (full browser environment bypasses anti-hotlink)
+        # Filter out already-seen and determine which to crawl each level
+        level_pages = [u for u in current_sub_pages if u not in seen_pages]
+        for sp in level_pages:
+            seen_pages.add(sp)
+
+        emit("phase", name=f"Processing {len(level_pages)} sub-pages via Playwright...")
+
+        try:
+            from playwright.async_api import async_playwright
+            from .browser import extract_sub_page_assets
+
+            async with async_playwright() as pw:
+                browser = await pw.chromium.launch(
+                    channel="chrome", headless=True,
+                    args=["--no-sandbox","--disable-blink-features=AutomationControlled",
+                          "--disable-web-security","--allow-running-insecure-content",
+                          "--window-size=1920,1080"],
+                )
+                p_context = await browser.new_context(
+                    user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+                    viewport={"width": 1920, "height": 1080},
+                    locale="zh-CN", timezone_id="Asia/Shanghai",
+                )
+
+                # Level 1: process seed's sub-pages
+                current_depth = 0
+                current_batch = level_pages
+                while current_depth < bfs_depth and current_batch:
+                    emit("phase", name=f"crawling sub-level {current_depth + 1}/{bfs_depth} ({len(current_batch)} pages)")
+                    next_level_pages: list[str] = []
+
+                    for i, sub_url in enumerate(current_batch):
+                        if len(seen_assets) >= _MAX_ASSETS:
+                            break
+                        emit("phase", name=f"sub-page [{i+1}/{len(current_batch)}]: {sub_url[:100]}")
+                        try:
+                            sub_urls, sub_bodies, sub_subs = await extract_sub_page_assets(p_context, sub_url)
+
+                            # Save bodies from this sub-page
+                            sub_saved = await _save_playwright_bodies(sub_bodies)
+                            if sub_saved > 0:
+                                emit("phase", name=f"  → saved {sub_saved} assets from {sub_url[:70]}")
+
+                            # Download non-body assets via httpx
+                            for u in sub_urls:
+                                if u not in seen_assets:
+                                    await try_download(u)
+
+                            # Collect next-level sub-pages (if we need depth 3)
+                            if current_depth + 1 < bfs_depth:
+                                for su in sub_subs:
+                                    if su not in seen_pages and _registered_host(urlparse(su).netloc) == base_host:
+                                        seen_pages.add(su)
+                                        next_level_pages.append(su)
+                        except Exception as e:
+                            emit("phase", name=f"  → failed: {e}")
+
+                    current_depth += 1
+                    current_batch = next_level_pages
+
+                await browser.close()
+
+        except ImportError:
+            emit("phase", name="Playwright not available for sub-pages")
+        except Exception as e:
+            emit("phase", name=f"Sub-page Playwright failed ({e})")
+
+    # ======================================================================
+    # Phase 3: CDN retry via Playwright (full browser context)
+    # ======================================================================
     if cdn_failed_urls and types:
         try:
             from .browser import download_assets_via_playwright
@@ -417,7 +300,6 @@ def _filename_for(resp: httpx.Response) -> str:
         part = cd.split("filename=", 1)[1].split(";", 1)[0].strip().strip('"')
         if part:
             return _safe(part)
-
     url = str(resp.url)
     path = urlparse(url).path
     if path and path != "/":
@@ -425,13 +307,10 @@ def _filename_for(resp: httpx.Response) -> str:
         if name:
             name = unquote(name)
             if "." not in name:
-                # Add extension from content-type
                 ext = _ct_to_ext(resp.headers.get("content-type", ""))
                 if ext:
                     name = f"{name}.{ext}"
             return _safe(name)
-
-    # Fallback: hash-based name
     ct = resp.headers.get("content-type", "")
     ext = _ct_to_ext(ct) or "bin"
     from hashlib import md5
