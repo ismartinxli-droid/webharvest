@@ -230,7 +230,7 @@ async def run(url: str, types: set[str], save_path: str, max_depth: int = 3) -> 
 
                 # Level 1: process seed's sub-pages
                 current_depth = 0
-                current_batch = level_pages[:20]  # cap per level to prevent runaway
+                current_batch = level_pages
                 while current_depth < bfs_depth and current_batch:
                     emit("phase", name=f"crawling sub-level {current_depth + 1}/{bfs_depth} ({len(current_batch)} pages)")
                     next_level_pages: list[str] = []
@@ -257,7 +257,7 @@ async def run(url: str, types: set[str], save_path: str, max_depth: int = 3) -> 
                                     await try_download(u)
 
                             # Collect next-level sub-pages (if we need depth 3)
-                            if current_depth + 1 < bfs_depth and len(next_level_pages) < 20:
+                            if current_depth + 1 < bfs_depth:
                                 for su in sub_subs:
                                     if su not in seen_pages and _registered_host(urlparse(su).netloc) == base_host:
                                         seen_pages.add(su)
