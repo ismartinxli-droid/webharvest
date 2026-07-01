@@ -70,34 +70,15 @@ async def _process_page(context, page, target_url: str) -> tuple[set[str], dict[
     saved_bodies: dict[str, bytes] = {}
 
     # --- Response capture ---
-    # Use page.route() to intercept video responses and capture full bodies.
-    # Unlike page.on("response"), route.fetch() returns the full body in one
-    # shot (no CDP "No data found" race for HTTP 206 partial content).
-    # Match by URL extension to avoid intercepting every single request.
-    async def _route_video(route):
-        url = route.request.url.lower()
-        # Only intercept URLs that look like video files
-        if any(url.endswith(ext) or f"{ext}?" in url for ext in (".mp4", ".mov", ".webm", ".mkv", ".avi", ".m4v", ".flv")):
-            try:
-                resp = await route.fetch()
-                body = await resp.body()
-                if body and len(body) > 100:
-                    saved_bodies[url] = body
-                await route.fulfill(response=resp)
-                urls.add(url)
-            except Exception:
-                await route.continue_()
-        else:
-            await route.continue_()
+    # Collect media (video) URLs during page load. Don't try to capture
+    # their bodies here — HTTP 206 partial content responses are unreliable
+    # for resp.body(). Instead, collect URLs and download them later via
+    # fetch() from the page context, which has full browser session access.
+    pending_video_urls: list[str] = []
 
-    await page.route("**/*", _route_video)
-
-    # For non-video assets and media fallback, still use the response handler.
-    # The route handler captures most video bodies; _on_resp catches the rest
-    # as best-effort (some may fail with "No data found" for 206 responses).
     async def _on_resp(resp):
         rt = resp.request.resource_type
-        if rt in ("image", "media", "font") and resp.ok:
+        if rt in ("image", "font") and resp.ok:
             if resp.url not in urls:
                 urls.add(resp.url)
             if resp.url not in saved_bodies:
@@ -111,6 +92,12 @@ async def _process_page(context, page, target_url: str) -> tuple[set[str], dict[
                                 saved_bodies[clean_url] = body
                 except Exception:
                     pass
+        elif rt == "media" and resp.ok:
+            if resp.url not in urls:
+                urls.add(resp.url)
+            # Save URL for post-load fetch — don't try resp.body() here
+            if resp.url not in pending_video_urls:
+                pending_video_urls.append(resp.url)
 
     page.on("response", _on_resp)
     page.on("requestfailed", lambda req: urls.add(req.url)
@@ -156,6 +143,25 @@ async def _process_page(context, page, target_url: str) -> tuple[set[str], dict[
     }""")
     if pdf_urls:
         for url, body in (await _download_assets_via_fetch(page, pdf_urls)).items():
+            saved_bodies[url] = body
+
+    # --- Videos via fetch() from page context ---
+    # Collect video URLs from both DOM and _on_resp, then download all of them
+    # via fetch() inside the page context (has full browser session, bypasses WAF).
+    dom_video_urls: list[str] = await page.evaluate("""() => {
+        const s=new Set();
+        document.querySelectorAll('video source[src]').forEach(el=>{if(el.src)s.add(el.src)});
+        document.querySelectorAll('video[src]').forEach(el=>{const src=el.getAttribute('src');if(src)s.add(src)});
+        return Array.from(s);
+    }""")
+    all_video_urls = list({u for u in pending_video_urls + dom_video_urls})
+    if all_video_urls:
+        for url in all_video_urls:
+            urls.add(url)
+        # Download videos: try all at once with 600s timeout.
+        # Per-URL AbortController: 45s. With 14 URLs × 45s worst case = 630s.
+        vid_bodies = await _download_assets_via_fetch(page, all_video_urls, timeout=600000)
+        for url, body in vid_bodies.items():
             saved_bodies[url] = body
 
     # --- DOM asset extraction ---
@@ -222,33 +228,33 @@ async def _process_page(context, page, target_url: str) -> tuple[set[str], dict[
 # Helpers
 # ---------------------------------------------------------------------------
 
-async def _download_assets_via_fetch(page, urls: list[str]) -> dict[str, bytes]:
-    """Download assets via fetch() with a per-URL timeout of 15s.
-    Total evaluate call is capped at 30s to prevent hanging on large files."""
+async def _download_assets_via_fetch(page, urls: list[str], timeout: int = 120000) -> dict[str, bytes]:
+    """Download assets via fetch() with a per-URL AbortController timeout of 45s.
+    Overall evaluate call capped by timeout param."""
     result: dict[str, bytes] = {}
     if not urls:
         return result
     try:
-        raw = await page.evaluate("""(urls) => {
+        raw = await asyncio.wait_for(page.evaluate("""(urls) => {
             async function dl(urls){
                 const r={};
                 for(const u of urls){
                     try{
                         const controller = new AbortController();
-                        const tid = setTimeout(() => controller.abort(), 30000);
+                        const tid = setTimeout(() => controller.abort(), 45000);
                         const p = await fetch(u, {credentials:"include", signal: controller.signal});
                         clearTimeout(tid);
-                        if(!p.ok)continue;
+                        if(!p.ok){ r[u] = "HTTP:" + p.status; continue; }
                         const b = await p.blob();
                         const reader=new FileReader();
                         const d=await new Promise((res)=>{reader.onload=()=>res(reader.result);reader.readAsDataURL(b)});
                         r[u]=d;
-                    }catch(e){}
+                    }catch(e){ r[u] = "ERR:" + e.message; }
                 }
                 return JSON.stringify(r);
             }
             return dl(urls);
-        }""", urls, timeout=30000)
+        }""", urls), timeout=timeout / 1000)  # convert ms to seconds
         raw_results = json.loads(raw)
         for url, data_url in raw_results.items():
             if isinstance(data_url, str) and "," in data_url:
@@ -271,10 +277,10 @@ async def _extract_fonts_from_stylesheets(page) -> dict[str, bytes]:
         data = json.loads(result)
         font_urls = data.get("urls", [])
         if font_urls:
-            download_result = await page.evaluate("""(urls) => {
+            download_result = await asyncio.wait_for(page.evaluate("""(urls) => {
                 async function dl(urls){const r={};for(const u of urls){try{const controller=new AbortController();const tid=setTimeout(()=>controller.abort(),15000);const p=await fetch(u,{credentials:'include',signal:controller.signal});clearTimeout(tid);if(!p.ok)continue;const b=await p.blob();const reader=new FileReader();const d=await new Promise((res)=>{reader.onload=()=>res(reader.result);reader.readAsDataURL(b)});r[u]=d}catch(e){}}return JSON.stringify(r)}
                 return dl(urls);
-            }""", font_urls, timeout=30000)
+            }""", font_urls), timeout=120)
             raw_results = json.loads(download_result)
             for url, data_url in raw_results.items():
                 if isinstance(data_url, str) and "," in data_url:
