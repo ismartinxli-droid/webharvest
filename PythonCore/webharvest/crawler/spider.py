@@ -54,11 +54,12 @@ async def run(url: str, types: set[str], save_path: str, max_depth: int = 3) -> 
     browser_urls: set[str] = set()
     browser_cookies: dict[str, str] = {}
     saved_bodies: dict[str, bytes] = {}  # bodies captured during Playwright page load
+    pw_sub_pages: set[str] = set()  # sub-page links from Playwright-rendered DOM
     try:
         from .browser import extract_asset_urls as browser_extract
 
         emit("phase", name="launching Chromium...")
-        browser_urls, browser_cookies, saved_bodies = await browser_extract(url)
+        browser_urls, browser_cookies, saved_bodies, pw_sub_pages = await browser_extract(url)
         emit("phase", name=f"Chromium found {len(browser_urls)} resources")
     except ImportError:
         emit("phase", name="Playwright not available, using static parser")
@@ -342,6 +343,19 @@ async def run(url: str, types: set[str], save_path: str, max_depth: int = 3) -> 
                 emit("asset.downloaded", type=ftype, path=str(dest_dir / name), size=len(body))
             emit("phase", name=f"Playwright captured {pw_saved} assets directly")
 
+        # Push sub-page links discovered by Playwright into the frontier.
+        # These are real same-host page URLs extracted from the rendered DOM.
+        # httpx-based process_page would fail on WAF-protected sites, so we
+        # must use Playwright-discovered links for depth crawling.
+        depth1_pages = []
+        for sub_url in pw_sub_pages:
+            if sub_url not in seen_pages:
+                seen_pages.add(sub_url)
+                frontier.push(sub_url)
+                depth1_pages.append(sub_url)
+        if depth1_pages:
+            emit("phase", name=f"Playwright found {len(depth1_pages)} sub-page links")
+
         # Next, download Playwright-discovered assets via httpx (non-WAF ones).
         # Playwright-captured bodies are already saved and added to seen_assets,
         # so try_download will skip them.
@@ -351,7 +365,11 @@ async def run(url: str, types: set[str], save_path: str, max_depth: int = 3) -> 
             for asset_url in remaining_urls:
                 await try_download(asset_url)
 
-        # BFS layer by layer
+        # BFS layer by layer.
+        # frontier currently has [seed, sub_1, ..., sub_N] where seed was pushed by UrlFrontier
+        # and sub_N were pushed by the Playwright sub-page discovery above.
+        # Drain ONLY the seed (first element) — sub-pages should be processed by BFS.
+        frontier.pop_batch(1)
         current_depth = 0
         while not frontier.empty() and len(seen_pages) < _MAX_PAGES and current_depth < max_depth:
             batch = frontier.pop_batch(8)

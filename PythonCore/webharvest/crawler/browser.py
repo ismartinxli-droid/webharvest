@@ -19,11 +19,19 @@ _CHROME_ARGS = [
 ]
 
 
-async def extract_asset_urls(target_url: str) -> tuple[set[str], dict[str, str], dict[str, bytes]]:
-    """Load a page in headless Chromium, wait for JS + lazy assets, return (all_urls, cookies_dict, saved_bodies).
+def _same_host(url: str, host: str) -> bool:
+    """Check if URL belongs to the same registered domain (used for same-host filtering)."""
+    h = urlparse(url).netloc.split(":")[0].lower()
+    return host == h or h.endswith("." + host) or host.endswith("." + h)
+
+
+async def extract_asset_urls(target_url: str) -> tuple[set[str], dict[str, str], dict[str, bytes], set[str]]:
+    """Load a page in headless Chromium, wait for JS + lazy assets, return (all_urls, cookies_dict, saved_bodies, sub_pages).
     saved_bodies contains the raw bytes of font/image/media responses captured during page load,
     which is the only reliable way to get WAF-protected assets (they load fine in Chrome's page context
-    but fail with HTTP 567 when httpx or Chrome-in-isolation requests them)."""
+    but fail with HTTP 567 when httpx or Chrome-in-isolation requests them).
+    sub_pages contains same-host page links extracted from the rendered DOM, used by the BFS crawler
+    to discover additional content at depth > 0."""
     urls: set[str] = set()
     saved_bodies: dict[str, bytes] = {}
 
@@ -236,9 +244,38 @@ async def extract_asset_urls(target_url: str) -> tuple[set[str], dict[str, str],
             if cd and (cd == target_domain_lower or cd.lstrip(".") == target_domain_lower or target_domain_lower.endswith("." + cd.lstrip("."))):
                 cookies[c["name"]] = c["value"]
 
+        # Extract sub-page links from rendered DOM for BFS depth crawling.
+        # httpx can't access these on WAF-protected sites (EdgeOne blocks with 567),
+        # so we extract them from the Playwright DOM instead.
+        sub_pages: set[str] = set()
+        pw_subpages: list[str] = await page.evaluate("""(host) => {
+            const pages = [];
+            const seen = new Set();
+            const IMG_EXTS = /\.(jpg|jpeg|png|gif|webp|bmp|svg|mp4|mov|webm|pdf|ico|avif|tiff|heic|ttf|otf|woff|woff2|eot)(\?|$)/i;
+            document.querySelectorAll('a[href]').forEach(a => {
+                let href = a.getAttribute('href') || '';
+                if (!href || href.startsWith('#') || href.startsWith('javascript:') || href.startsWith('mailto:') || href.startsWith('tel:')) return;
+                if (href.startsWith('http') && !href.includes(host)) return;
+                try {
+                    const abs = new URL(href, location.href).href.split('#')[0];
+                    if (seen.has(abs)) return;
+                    seen.add(abs);
+                    // Skip asset URLs (images, PDFs, videos — handled separately)
+                    if (IMG_EXTS.test(abs)) return;
+                    // Skip non-http protocols
+                    if (!abs.startsWith('http')) return;
+                    pages.push(abs);
+                } catch(e) {}
+            });
+            return pages;
+        }""", target_domain)
+        for u in pw_subpages:
+            if _same_host(u, target_domain):
+                sub_pages.add(u)
+
         await browser.close()
 
-    return urls, cookies, saved_bodies
+    return urls, cookies, saved_bodies, sub_pages
 
 
 async def _download_assets_via_fetch(page, urls: list[str]) -> dict[str, bytes]:
