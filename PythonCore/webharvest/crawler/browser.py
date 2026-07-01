@@ -223,7 +223,7 @@ async def _download_assets_via_fetch(page, urls: list[str]) -> dict[str, bytes]:
                 for(const u of urls){
                     try{
                         const controller = new AbortController();
-                        const tid = setTimeout(() => controller.abort(), 15000);
+                        const tid = setTimeout(() => controller.abort(), 30000);
                         const p = await fetch(u, {credentials:"include", signal: controller.signal});
                         clearTimeout(tid);
                         if(!p.ok)continue;
